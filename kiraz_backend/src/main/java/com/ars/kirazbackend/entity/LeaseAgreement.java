@@ -85,6 +85,12 @@ public class LeaseAgreement {
     }
 
     @Transient
+    @JsonProperty("tenantId")
+    public Long getTenantId() {
+        return tenant != null ? tenant.getId() : null;
+    }
+
+    @Transient
     @JsonProperty("tenantName")
     public String getTenantName() {
         return tenant != null ? tenant.getFullName() : null;

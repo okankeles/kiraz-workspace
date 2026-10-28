@@ -200,7 +200,9 @@ class _MenuScreenState extends State<MenuScreen> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: cardBorder),
       ),
-      child: ListTile(
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
         onTap: onTap ??
             () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -244,7 +246,7 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-    );
+    ));
   }
 
   @override
@@ -415,8 +417,10 @@ class _MenuScreenState extends State<MenuScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                   ),
-                  child: ListTile(
-                    onTap: _logout,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      onTap: _logout,
                     leading: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -442,7 +446,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded, color: Colors.redAccent, size: 20),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
+                  )),
                 ),
 
                 const SizedBox(height: 12),
@@ -455,8 +459,10 @@ class _MenuScreenState extends State<MenuScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
                   ),
-                  child: ListTile(
-                    onTap: _resetApp,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      onTap: _resetApp,
                     leading: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -482,7 +488,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded, color: Colors.red, size: 20),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
+                  )),
                 ),
 
                 const SizedBox(height: 32),

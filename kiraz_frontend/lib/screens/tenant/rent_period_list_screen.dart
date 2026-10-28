@@ -102,23 +102,19 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
     }
   }
 
-  Future<void> _handleUpdateStatus(
-    BuildContext dialogContext,
-    int periodId,
-    String status,
-  ) async {
+  Future<void> _updatePeriodStatus(RentPeriod period, String status) async {
     try {
-      await _rentPeriodService.updatePeriodStatus(periodId, status);
+      await _rentPeriodService.updatePeriodStatus(period.id, status);
       if (!mounted) return;
-      if (dialogContext.mounted) {
-        Navigator.of(dialogContext).pop();
-      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            status == 'ÖDENDİ' ? 'Ödeme onaylandı!' : 'Ödeme reddedildi.',
+            status == 'PAID' || status == 'ÖDENDİ'
+                ? 'Ödeme onaylandı!'
+                : 'Dekont reddedildi.',
           ),
-          backgroundColor: status == 'ÖDENDİ' ? Colors.green : Colors.orange,
+          backgroundColor:
+              status == 'PAID' || status == 'ÖDENDİ' ? Colors.green : Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -146,45 +142,39 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
       fullImageUrl = '${ApiConstants.baseUrl}$rawUrl';
     }
 
-    bool isUpdating = false;
-
     showDialog(
       context: context,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (_, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Ödeme Dekontu',
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: isUpdating
-                                ? null
-                                : () => Navigator.of(dialogContext).pop(),
-                            icon: const Icon(Icons.close),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
+                      Text(
+                        'Ödeme Dekontu',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
+                      IconButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        icon: const Icon(Icons.close),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
                       const SizedBox(height: 16),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
@@ -302,80 +292,58 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                           ),
                         ),
                       ] else if (widget.effectiveIsLandlord) ...[
-                        if (isUpdating)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8.0),
-                              child: CircularProgressIndicator(),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  Navigator.of(dialogContext).pop();
+                                  _updatePeriodStatus(period, 'REJECTED');
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                  side: const BorderSide(color: Colors.red),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Reddet',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
                             ),
-                          )
-                        else
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () async {
-                                    setDialogState(() => isUpdating = true);
-                                    await _handleUpdateStatus(
-                                      dialogContext,
-                                      period.id,
-                                      'REDDEDİLDİ',
-                                    );
-                                    if (mounted) {
-                                      setDialogState(() => isUpdating = false);
-                                    }
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.red,
-                                    side: const BorderSide(color: Colors.red),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.of(dialogContext).pop();
+                                  _updatePeriodStatus(period, 'PAID');
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
                                   ),
-                                  child: const Text(
-                                    'Reddet',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
+                                  elevation: 0,
+                                ),
+                                child: const Text(
+                                  'Onayla',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () async {
-                                    setDialogState(() => isUpdating = true);
-                                    await _handleUpdateStatus(
-                                      dialogContext,
-                                      period.id,
-                                      'ÖDENDİ',
-                                    );
-                                    if (mounted) {
-                                      setDialogState(() => isUpdating = false);
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                  child: const Text(
-                                    'Onayla',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
+                        ),
                       ] else ...[
                         ElevatedButton(
                           onPressed: () => Navigator.of(dialogContext).pop(),
@@ -404,9 +372,7 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
             );
           },
         );
-      },
-    );
-  }
+      }
 
   String _formatStatus(String status) {
     switch (status.toUpperCase()) {
@@ -421,7 +387,7 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
       case 'REJECTED':
       case 'REDDEDILDI':
       case 'REDDEDİLDİ':
-        return 'REDDEDİLDİ';
+        return 'Reddedildi';
       case 'OVERDUE':
       case 'GECIKTI':
       case 'GECİKTİ':
@@ -444,7 +410,7 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
       case 'REJECTED':
       case 'REDDEDILDI':
       case 'REDDEDİLDİ':
-        return Colors.red.shade700;
+        return Colors.red;
       case 'OVERDUE':
       case 'GECIKTI':
       case 'GECİKTİ':
@@ -452,6 +418,44 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
       default:
         return Colors.grey.shade700;
     }
+  }
+
+  Widget _buildStatusBadge(String status) {
+    final s = status.toUpperCase();
+    if (s == 'REJECTED' || s == 'REDDEDİLDİ' || s == 'REDDEDILDI') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Reddedildi',
+          style: TextStyle(
+            color: Colors.red,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+    final statusColor = _getStatusColor(status);
+    final statusLabel = _formatStatus(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        statusLabel,
+        style: TextStyle(
+          color: statusColor,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 
   bool _isPaid(String status) {
@@ -531,8 +535,6 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                         final isPaid = _isPaid(period.status);
                         final hasReceipt = period.receiptImageUrl != null &&
                             period.receiptImageUrl!.isNotEmpty;
-                        final statusLabel = _formatStatus(period.status);
-                        final statusColor = _getStatusColor(period.status);
                         final isUploading = _uploadingPeriodId == period.id;
 
                         final dateDisplay = period.periodEnd.isNotEmpty
@@ -581,24 +583,7 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                                         ),
                                       ],
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        statusLabel,
-                                        style: TextStyle(
-                                          color: statusColor,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
+                                    _buildStatusBadge(period.status),
                                   ],
                                 ),
                                 if (!widget.effectiveIsLandlord) ...[

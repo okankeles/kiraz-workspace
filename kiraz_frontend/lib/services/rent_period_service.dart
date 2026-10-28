@@ -121,4 +121,6 @@ class RentPeriodService {
       throw Exception('Durum güncellenirken hata: $e');
     }
   }
+
+  Future<void> updateStatus(int periodId, String status) => updatePeriodStatus(periodId, status);
 }

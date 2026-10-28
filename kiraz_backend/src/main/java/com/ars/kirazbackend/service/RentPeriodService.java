@@ -120,6 +120,9 @@ public class RentPeriodService {
             }
         }
         period.setStatus(paymentStatus);
+        if (paymentStatus == PaymentStatus.REJECTED) {
+            period.setReceiptImageUrl(null); // Clear the invalid receipt so tenant can re-upload
+        }
         RentPeriod savedPeriod = rentPeriodRepository.save(period);
 
         if (paymentStatus == PaymentStatus.PAID) {
@@ -140,8 +143,22 @@ public class RentPeriodService {
                         savedPeriod.getLeaseAgreement().getId()
                 );
             }
+        } else if (paymentStatus == PaymentStatus.REJECTED) {
+            period.setReceiptImageUrl(null); // Clear the invalid receipt so tenant can re-upload
+            notificationService.createNotification(
+                period.getLeaseAgreement().getTenantId(),
+                "Ödeme Reddedildi",
+                period.getLeaseAgreement().getProperty().getTitle() + " için yüklediğiniz dekont reddedildi. Lütfen yeni bir dekont yükleyin.",
+                "REJECT",
+                period.getLeaseAgreement().getId()
+            );
         }
 
         return savedPeriod;
+    }
+
+    @Transactional
+    public RentPeriod updateStatus(Long id, PaymentStatus status) {
+        return updateStatus(id, status != null ? status.name() : null);
     }
 }

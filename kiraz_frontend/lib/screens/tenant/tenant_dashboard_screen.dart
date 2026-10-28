@@ -13,6 +13,7 @@ import '../../services/lease_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
+import '../../widgets/cherry_logo.dart';
 import '../auth/invite_code_screen.dart';
 
 class TenantDashboardScreen extends StatefulWidget {
@@ -1564,19 +1565,8 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
         titleSpacing: 20,
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: accentBlue.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.home_rounded,
-                color: accentBlue,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 10),
+            const CherryLogo(size: 28, color: vibrantBlue),
+            const SizedBox(width: 8),
             Text(
               'kiraZ',
               style: GoogleFonts.poppins(

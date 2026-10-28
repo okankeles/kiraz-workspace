@@ -550,7 +550,7 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
     );
   }
 
-  void _showReceiptApprovalDialog(PendingApprovalItem item) {
+  void _showReceiptDialog(PendingApprovalItem item) {
     final rawUrl = item.period.receiptImageUrl ?? '';
     if (rawUrl.isEmpty) return;
 
@@ -697,7 +697,54 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                               child: const Text('Kapat'),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextButton(
+                              onPressed: isApproving
+                                  ? null
+                                  : () async {
+                                      setDialogState(() => isApproving = true);
+                                      try {
+                                        await RentPeriodService().updateStatus(item.period.id, 'REJECTED');
+                                        if (dialogContext.mounted) {
+                                          Navigator.pop(dialogContext);
+                                        }
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Dekont reddedildi'),
+                                            backgroundColor: Colors.red,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                        await _fetchLandlordData();
+                                      } catch (e) {
+                                        if (dialogContext.mounted) {
+                                          setDialogState(() => isApproving = false);
+                                        }
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Hata: $e'),
+                                            backgroundColor: Colors.red,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    },
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(color: Colors.red),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: const Text(
+                                'Reddet',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Expanded(
                             flex: 2,
                             child: ElevatedButton.icon(
@@ -948,7 +995,7 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                           ],
                         ),
                         ElevatedButton.icon(
-                          onPressed: () => _showReceiptApprovalDialog(item),
+                          onPressed: () => _showReceiptDialog(item),
                           icon: const Icon(Icons.visibility_outlined, size: 16),
                           label: const Text('Dekontu Gör'),
                           style: ElevatedButton.styleFrom(
