@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../main.dart';
 import '../../models/dashboard_stats.dart';
@@ -563,6 +564,7 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isPdf = rawUrl.toLowerCase().endsWith('.pdf');
     bool isApproving = false;
 
     showDialog(
@@ -647,41 +649,113 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                         child: Container(
                           constraints: const BoxConstraints(maxHeight: 340),
                           color: isDark ? const Color(0xFF0F172A) : Colors.black.withValues(alpha: 0.04),
-                          child: Image.network(
-                            fullImageUrl,
-                            fit: BoxFit.contain,
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) return child;
-                              return SizedBox(
-                                height: 200,
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    value: progress.expectedTotalBytes != null
-                                        ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                        : null,
-                                    color: vibrantBlue,
-                                  ),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 160,
-                                alignment: Alignment.center,
+                        child: isPdf
+                            ? Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
                                 child: Column(
+                                  mainAxisSize: MainAxisSize.min,
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(Icons.broken_image_outlined, size: 40, color: Colors.grey),
-                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withValues(alpha: 0.12),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.picture_as_pdf,
+                                        size: 52,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
                                     Text(
-                                      'Dekont görseli yüklenemedi',
-                                      style: GoogleFonts.inter(fontSize: 12, color: Colors.grey),
+                                      'PDF Formatında Dekont',
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: isDark ? Colors.white : Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Dekont belgesini cihazınızda görüntüleyin veya indirin.',
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13,
+                                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    ElevatedButton.icon(
+                                      onPressed: () async {
+                                        try {
+                                          final uri = Uri.parse(fullImageUrl);
+                                          if (await canLaunchUrl(uri)) {
+                                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                          } else {
+                                            await launchUrl(uri);
+                                          }
+                                        } catch (e) {
+                                          if (!dialogContext.mounted) return;
+                                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Dosya açılamadı: $e'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      icon: const Icon(Icons.open_in_new, size: 18),
+                                      label: const Text('PDF Olarak İndir/Görüntüle'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: vibrantBlue,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                        elevation: 0,
+                                      ),
                                     ),
                                   ],
                                 ),
-                              );
-                            },
-                          ),
+                              )
+                            : Image.network(
+                                fullImageUrl,
+                                fit: BoxFit.contain,
+                                loadingBuilder: (context, child, progress) {
+                                  if (progress == null) return child;
+                                  return SizedBox(
+                                    height: 200,
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        value: progress.expectedTotalBytes != null
+                                            ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                            : null,
+                                        color: vibrantBlue,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 160,
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.broken_image_outlined, size: 40, color: Colors.grey),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Dekont görseli yüklenemedi',
+                                          style: GoogleFonts.inter(fontSize: 12, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                         ),
                       ),
                       const SizedBox(height: 20),

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -83,5 +84,12 @@ public class LeaseController {
     @GetMapping("/{id}")
     public ResponseEntity<LeaseAgreement> getLeaseById(@PathVariable Long id) {
         return ResponseEntity.ok(leaseService.getLeaseById(id));
+    }
+
+    @PostMapping(value = "/{id}/contract", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<LeaseAgreement> uploadContract(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(leaseService.uploadContract(id, file));
     }
 }

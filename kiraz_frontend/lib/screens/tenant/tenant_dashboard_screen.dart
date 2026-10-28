@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../main.dart';
 import '../../models/dashboard_stats.dart';
@@ -312,7 +313,10 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   }
 
   Future<void> _onUploadReceipt(RentPeriod period) async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+    );
 
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
@@ -375,6 +379,31 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     }
   }
 
+  Future<void> _viewContract(String rawUrl) async {
+    try {
+      String url = rawUrl;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        final prefix = url.startsWith('/') ? '' : '/';
+        url = '${ApiConstants.baseUrl}$prefix$url';
+      }
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sözleşme açılamadı: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   void _showReceiptViewer(RentPeriod period) {
     final rawUrl = period.receiptImageUrl ?? '';
     if (rawUrl.isEmpty) return;
@@ -388,6 +417,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isPdf = rawUrl.toLowerCase().endsWith('.pdf');
 
     showDialog(
       context: context,
@@ -430,9 +460,81 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                     child: Container(
                       constraints: const BoxConstraints(maxHeight: 380),
                       color: isDark ? const Color(0xFF0F172A) : Colors.black.withValues(alpha: 0.04),
-                      child: Image.network(
-                        fullImageUrl,
-                        fit: BoxFit.contain,
+                      child: isPdf
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.picture_as_pdf,
+                                      size: 52,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    'PDF Formatında Dekont',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: isDark ? Colors.white : Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Dekont belgesini cihazınızda görüntüleyin veya indirin.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      try {
+                                        final uri = Uri.parse(fullImageUrl);
+                                        if (await canLaunchUrl(uri)) {
+                                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        } else {
+                                          await launchUrl(uri);
+                                        }
+                                      } catch (e) {
+                                        if (!dialogContext.mounted) return;
+                                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Dosya açılamadı: $e'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.open_in_new, size: 18),
+                                    label: const Text('PDF Olarak İndir/Görüntüle'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: vibrantBlue,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                      elevation: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Image.network(
+                              fullImageUrl,
+                              fit: BoxFit.contain,
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
                           final total = loadingProgress.expectedTotalBytes;
@@ -913,6 +1015,23 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
               ),
             ],
           ),
+          if (lease.contractFileUrl != null && lease.contractFileUrl!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _viewContract(lease.contractFileUrl!),
+              icon: const Icon(Icons.description_outlined, size: 18),
+              label: const Text('Sözleşmeyi Görüntüle'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: vibrantBlue,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ],
         ],
       ),
     );

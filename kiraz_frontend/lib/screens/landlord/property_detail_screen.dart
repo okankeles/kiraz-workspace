@@ -1,9 +1,13 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/lease.dart';
 import '../../models/property.dart';
 import '../../services/lease_service.dart';
+import '../../utils/constants.dart';
 import '../tenant/rent_period_list_screen.dart';
 import 'assign_tenant_screen.dart';
 
@@ -24,6 +28,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   List<Lease> _leases = [];
   bool _isLoadingLeases = true;
+  int? _uploadingLeaseId;
 
   @override
   void initState() {
@@ -43,6 +48,69 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isLoadingLeases = false);
+    }
+  }
+
+  Future<void> _uploadContract(Lease lease) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'png'],
+      );
+
+      if (result != null && result.files.isNotEmpty && result.files.single.path != null) {
+        setState(() => _uploadingLeaseId = lease.id);
+        final file = File(result.files.single.path!);
+        await LeaseService().uploadContract(lease.id, file);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sözleşme başarıyla yüklendi!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        await _fetchLeases();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sözleşme yüklenemedi: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingLeaseId = null);
+      }
+    }
+  }
+
+  Future<void> _viewContract(String rawUrl) async {
+    try {
+      String url = rawUrl;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        final prefix = url.startsWith('/') ? '' : '/';
+        url = '${ApiConstants.baseUrl}$prefix$url';
+      }
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sözleşme açılamadı: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -390,6 +458,57 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                           ),
                                           elevation: 0,
                                         ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: (lease.contractFileUrl == null ||
+                                                    lease.contractFileUrl!.isEmpty)
+                                                ? OutlinedButton.icon(
+                                                    onPressed: _uploadingLeaseId == lease.id
+                                                        ? null
+                                                        : () => _uploadContract(lease),
+                                                    icon: _uploadingLeaseId == lease.id
+                                                        ? const SizedBox(
+                                                            width: 16,
+                                                            height: 16,
+                                                            child: CircularProgressIndicator(
+                                                              strokeWidth: 2,
+                                                            ),
+                                                          )
+                                                        : const Icon(Icons.upload_file, size: 18),
+                                                    label: Text(
+                                                      _uploadingLeaseId == lease.id
+                                                          ? 'Yükleniyor...'
+                                                          : 'Sözleşme Yükle',
+                                                    ),
+                                                    style: OutlinedButton.styleFrom(
+                                                      foregroundColor: vibrantBlue,
+                                                      side: const BorderSide(color: vibrantBlue),
+                                                      minimumSize: const Size(double.infinity, 40),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(10),
+                                                      ),
+                                                    ),
+                                                  )
+                                                : ElevatedButton.icon(
+                                                    onPressed: () =>
+                                                        _viewContract(lease.contractFileUrl!),
+                                                    icon: const Icon(Icons.description, size: 18),
+                                                    label: const Text('Sözleşmeyi Görüntüle'),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: vibrantBlue,
+                                                      foregroundColor: Colors.white,
+                                                      minimumSize: const Size(double.infinity, 40),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(10),
+                                                      ),
+                                                      elevation: 0,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),

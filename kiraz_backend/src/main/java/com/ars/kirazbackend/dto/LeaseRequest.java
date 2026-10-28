@@ -25,4 +25,5 @@ public class LeaseRequest {
     private BigDecimal monthlyRentAmount;
     private BigDecimal depositAmount;
     private Integer paymentDay;
+    private String contractFileUrl;
 }

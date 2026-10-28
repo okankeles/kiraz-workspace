@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.web.multipart.MultipartFile;
+
 @Service
 @RequiredArgsConstructor
 public class LeaseService {
@@ -32,6 +34,7 @@ public class LeaseService {
     private final RentPeriodRepository rentPeriodRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
+    private final FileStorageService fileStorageService;
 
     @Transactional
     public LeaseAgreement createLease(LeaseRequest request) {
@@ -103,6 +106,7 @@ public class LeaseService {
                 .paymentDay(paymentDay)
                 .status(LeaseStatus.PENDING)
                 .inviteCode(inviteCode)
+                .contractFileUrl(request.getContractFileUrl())
                 .build();
         LeaseAgreement savedLease = leaseRepository.save(lease);
 
@@ -201,5 +205,15 @@ public class LeaseService {
     public LeaseAgreement getLeaseById(Long id) {
         return leaseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sözleşme bulunamadı: " + id));
+    }
+
+    @Transactional
+    public LeaseAgreement uploadContract(Long leaseId, MultipartFile file) {
+        LeaseAgreement lease = leaseRepository.findById(leaseId)
+                .orElseThrow(() -> new RuntimeException("Sözleşme bulunamadı: " + leaseId));
+
+        String fileUrl = fileStorageService.storeFile(file);
+        lease.setContractFileUrl(fileUrl);
+        return leaseRepository.save(lease);
     }
 }

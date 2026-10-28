@@ -22,15 +22,20 @@ public class FileStorageService {
     }
 
     public String storeFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("Yüklenecek dosya boş olamaz.");
+        }
         try {
-            String originalFileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "receipt.jpg";
+            String originalFileName = file.getOriginalFilename() != null && !file.getOriginalFilename().trim().isEmpty()
+                    ? file.getOriginalFilename()
+                    : "document.pdf";
             String sanitizedFileName = originalFileName.replaceAll("[^a-zA-Z0-9\\.\\-]", "_");
             String fileName = UUID.randomUUID().toString() + "_" + sanitizedFileName;
             Path targetLocation = this.fileStorageLocation.resolve(fileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
             return "/uploads/receipts/" + fileName;
         } catch (Exception ex) {
-            throw new RuntimeException("Could not store file.", ex);
+            throw new RuntimeException("Dosya kaydedilemedi: " + ex.getMessage(), ex);
         }
     }
 }

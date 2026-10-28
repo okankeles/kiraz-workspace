@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/lease.dart';
 import '../../models/rent_period.dart';
@@ -67,7 +68,10 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
   }
 
   Future<void> _onUploadReceipt(RentPeriod period) async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+    );
 
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
@@ -135,11 +139,13 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
     final isPaid = _isPaid(period.status);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final rawUrl = period.receiptImageUrl ?? '';
+    final isPdf = rawUrl.toLowerCase().endsWith('.pdf');
     final String fullImageUrl;
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       fullImageUrl = rawUrl;
     } else {
-      fullImageUrl = '${ApiConstants.baseUrl}$rawUrl';
+      final prefix = rawUrl.startsWith('/') ? '' : '/';
+      fullImageUrl = '${ApiConstants.baseUrl}$prefix$rawUrl';
     }
 
     showDialog(
@@ -181,60 +187,132 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                         child: Container(
                           constraints: const BoxConstraints(maxHeight: 350),
                           color: Colors.black.withValues(alpha: 0.04),
-                          child: rawUrl.isNotEmpty
-                              ? Image.network(
-                                  fullImageUrl,
-                                  fit: BoxFit.contain,
-                                  loadingBuilder:
-                                      (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    final total =
-                                        loadingProgress.expectedTotalBytes;
-                                    final loaded = loadingProgress
-                                        .cumulativeBytesLoaded;
-                                    return Container(
-                                      height: 200,
-                                      alignment: Alignment.center,
-                                      child: CircularProgressIndicator(
-                                        value: total != null
-                                            ? loaded / total
-                                            : null,
+                          child: isPdf
+                              ? Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withValues(alpha: 0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.picture_as_pdf,
+                                          size: 52,
+                                          color: Colors.red,
+                                        ),
                                       ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      height: 160,
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.all(16),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.broken_image_outlined,
-                                            size: 40,
-                                            color: Colors.grey,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Görsel yüklenemedi',
-                                            style: TextStyle(
-                                              color: Colors.grey.shade600,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ],
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        'PDF Formatında Dekont',
+                                        style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
                                       ),
-                                    );
-                                  },
-                                )
-                              : const SizedBox(
-                                  height: 120,
-                                  child: Center(
-                                    child: Text('Kayıtlı dekont görseli yok'),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Dekont belgesini cihazınızda görüntüleyin veya indirin.',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 18),
+                                      ElevatedButton.icon(
+                                        onPressed: () async {
+                                          try {
+                                            final uri = Uri.parse(fullImageUrl);
+                                            if (await canLaunchUrl(uri)) {
+                                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                            } else {
+                                              await launchUrl(uri);
+                                            }
+                                          } catch (e) {
+                                            if (!dialogContext.mounted) return;
+                                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Dosya açılamadı: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        icon: const Icon(Icons.open_in_new, size: 18),
+                                        label: const Text('PDF Olarak İndir/Görüntüle'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF2563EB),
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                          elevation: 0,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
+                                )
+                              : (rawUrl.isNotEmpty
+                                  ? Image.network(
+                                      fullImageUrl,
+                                      fit: BoxFit.contain,
+                                      loadingBuilder:
+                                          (context, child, loadingProgress) {
+                                        if (loadingProgress == null) return child;
+                                        final total =
+                                            loadingProgress.expectedTotalBytes;
+                                        final loaded = loadingProgress
+                                            .cumulativeBytesLoaded;
+                                        return Container(
+                                          height: 200,
+                                          alignment: Alignment.center,
+                                          child: CircularProgressIndicator(
+                                            value: total != null
+                                                ? loaded / total
+                                                : null,
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          height: 160,
+                                          alignment: Alignment.center,
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              const Icon(
+                                                Icons.broken_image_outlined,
+                                                size: 40,
+                                                color: Colors.grey,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Görsel yüklenemedi',
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade600,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : const SizedBox(
+                                      height: 120,
+                                      child: Center(
+                                        child: Text('Kayıtlı dekont görseli yok'),
+                                      ),
+                                    )),
                         ),
                       ),
                       const SizedBox(height: 20),

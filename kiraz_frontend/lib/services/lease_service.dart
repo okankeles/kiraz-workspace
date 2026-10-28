@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../models/lease.dart';
 import '../utils/constants.dart';
 
@@ -190,6 +192,45 @@ class LeaseService {
       }
     } catch (e) {
       throw Exception('Sözleşme detayı alınırken hata: $e');
+    }
+  }
+
+  Future<void> uploadContract(int leaseId, File file) async {
+    final url = Uri.parse('${ApiConstants.baseUrl}/leases/$leaseId/contract');
+
+    try {
+      final request = http.MultipartRequest('POST', url);
+
+      final bytes = await file.readAsBytes();
+      final filename = file.path.split(Platform.pathSeparator).last;
+      final ext = filename.contains('.') ? filename.split('.').last.toLowerCase() : '';
+
+      MediaType? contentType;
+      if (ext == 'png') {
+        contentType = MediaType('image', 'png');
+      } else if (ext == 'jpg' || ext == 'jpeg') {
+        contentType = MediaType('image', 'jpeg');
+      } else if (ext == 'pdf') {
+        contentType = MediaType('application', 'pdf');
+      }
+
+      final multipartFile = http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: contentType,
+      );
+
+      request.files.add(multipartFile);
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Sözleşme yüklenemedi: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Sözleşme yükleme hatası: $e');
     }
   }
 }
