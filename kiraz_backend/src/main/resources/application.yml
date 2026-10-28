@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: kiraz-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5433/kiraz_db
+    username: ars_admin
+    password: ars_password_2026
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
