@@ -536,8 +536,8 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                         final isUploading = _uploadingPeriodId == period.id;
 
                         final dateDisplay = period.periodEnd.isNotEmpty
-                            ? "${period.periodStart}  —  ${period.periodEnd}"
-                            : period.periodStart;
+                            ? "${period.periodStartFormatted}  —  ${period.periodEnd}"
+                            : period.periodStartFormatted;
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),

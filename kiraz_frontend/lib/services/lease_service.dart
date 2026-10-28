@@ -84,22 +84,28 @@ class LeaseService {
     String tenantName,
     String tenantEmail,
     double rentAmount,
-    String startDate,
-  ) async {
+    String startDate, {
+    double? depositAmount,
+  }) async {
     final url = Uri.parse('${ApiConstants.baseUrl}/leases');
+
+    final Map<String, dynamic> body = {
+      'propertyId': propertyId,
+      'tenantName': tenantName,
+      'tenantEmail': tenantEmail,
+      'rentAmount': rentAmount,
+      'startDate': startDate,
+    };
+    if (depositAmount != null) {
+      body['depositAmount'] = depositAmount;
+    }
 
     final http.Response response;
     try {
       response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'propertyId': propertyId,
-          'tenantName': tenantName,
-          'tenantEmail': tenantEmail,
-          'rentAmount': rentAmount,
-          'startDate': startDate,
-        }),
+        body: json.encode(body),
       );
     } catch (e) {
       throw Exception('Bağlantı hatası: $e');

@@ -23,6 +23,7 @@ class _AssignTenantScreenState extends State<AssignTenantScreen> {
   final TextEditingController _tenantNameController = TextEditingController();
   final TextEditingController _tenantEmailController = TextEditingController();
   final TextEditingController _rentAmountController = TextEditingController();
+  final TextEditingController _depositController = TextEditingController();
   final TextEditingController _startDateController = TextEditingController();
 
   bool _isLoading = false;
@@ -41,6 +42,7 @@ class _AssignTenantScreenState extends State<AssignTenantScreen> {
     _tenantNameController.dispose();
     _tenantEmailController.dispose();
     _rentAmountController.dispose();
+    _depositController.dispose();
     _startDateController.dispose();
     super.dispose();
   }
@@ -89,6 +91,9 @@ class _AssignTenantScreenState extends State<AssignTenantScreen> {
       return;
     }
 
+    final depositText = _depositController.text.trim();
+    final depositAmount = depositText.isNotEmpty ? double.tryParse(depositText) : null;
+
     setState(() => _isLoading = true);
 
     try {
@@ -98,6 +103,7 @@ class _AssignTenantScreenState extends State<AssignTenantScreen> {
         email,
         rentAmount,
         startDate,
+        depositAmount: depositAmount,
       );
 
       if (!mounted) return;
@@ -286,6 +292,19 @@ class _AssignTenantScreenState extends State<AssignTenantScreen> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+
+                // Deposit Amount
+                TextFormField(
+                  controller: _depositController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: _inputDecoration(
+                    label: 'Depozito Tutarı (TL)',
+                    hintText: 'Örn: 25000',
+                    prefixIcon: Icons.shield_outlined,
+                    isDark: isDark,
+                  ),
                 ),
                 const SizedBox(height: 16),
 

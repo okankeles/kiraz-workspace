@@ -249,7 +249,7 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
                       textCapitalization: TextCapitalization.characters,
                       decoration: _inputDecoration(
                         label: 'Davet Kodu',
-                        hintText: 'Örn: KRZ-XXXX',
+                        hintText: 'Örn: ARS-XXXX',
                         prefixIcon: Icons.vpn_key_outlined,
                         isDark: isDark,
                       ),

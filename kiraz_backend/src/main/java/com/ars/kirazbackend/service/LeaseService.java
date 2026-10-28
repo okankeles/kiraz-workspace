@@ -31,6 +31,7 @@ public class LeaseService {
     private final UserRepository userRepository;
     private final RentPeriodRepository rentPeriodRepository;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
     @Transactional
     public LeaseAgreement createLease(LeaseRequest request) {
@@ -162,7 +163,19 @@ public class LeaseService {
         LeaseAgreement lease = leaseRepository.findById(leaseId)
                 .orElseThrow(() -> new RuntimeException("Lease not found"));
         lease.setStatus(LeaseStatus.ACTIVE);
-        return leaseRepository.save(lease);
+        LeaseAgreement savedLease = leaseRepository.save(lease);
+
+        if (savedLease.getProperty() != null && savedLease.getProperty().getLandlord() != null) {
+            notificationService.createNotification(
+                    savedLease.getProperty().getLandlord().getId(),
+                    "Sözleşme Onaylandı",
+                    savedLease.getTenantName() + " adlı kiracı " + savedLease.getProperty().getTitle() + " mülkü için sözleşmeyi onayladı.",
+                    "LEASE",
+                    savedLease.getId()
+            );
+        }
+
+        return savedLease;
     }
 
     public LeaseAgreement findByInviteCode(String inviteCode) {

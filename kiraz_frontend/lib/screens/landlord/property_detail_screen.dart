@@ -272,6 +272,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               ..._leases.map((lease) {
+                                final isPending =
+                                    lease.status?.toUpperCase() == 'PENDING';
                                 return Container(
                                   padding: const EdgeInsets.all(16),
                                   margin: const EdgeInsets.only(bottom: 12),
@@ -294,7 +296,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
-                                            'Aktif Sözleşme #${lease.id}',
+                                            isPending
+                                                ? 'Onay Bekleyen Sözleşme #${lease.id}'
+                                                : 'Aktif Sözleşme #${lease.id}',
                                             style: GoogleFonts.poppins(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 15,
@@ -307,13 +311,21 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                               vertical: 3,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: Colors.green.withValues(alpha: 0.15),
+                                              color: isPending
+                                                  ? (isDark
+                                                      ? const Color(0xFF78350F).withValues(alpha: 0.35)
+                                                      : const Color(0xFFFEF3C7))
+                                                  : Colors.green.withValues(alpha: 0.15),
                                               borderRadius: BorderRadius.circular(8),
                                             ),
-                                            child: const Text(
-                                              'Aktif',
+                                            child: Text(
+                                              isPending ? 'Onay Bekliyor' : 'Aktif',
                                               style: TextStyle(
-                                                color: Colors.green,
+                                                color: isPending
+                                                    ? (isDark
+                                                        ? const Color(0xFFFBBF24)
+                                                        : const Color(0xFFD97706))
+                                                    : Colors.green,
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.bold,
                                               ),

@@ -23,7 +23,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _daskController = TextEditingController();
-  final TextEditingController _depositController = TextEditingController();
 
   DateTime? _selectedDaskDate;
   bool _isLoading = false;
@@ -34,7 +33,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     _addressController.dispose();
     _cityController.dispose();
     _daskController.dispose();
-    _depositController.dispose();
     super.dispose();
   }
 
@@ -78,8 +76,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final depositText = _depositController.text.trim();
-      final depositAmount = depositText.isNotEmpty ? double.tryParse(depositText) : null;
       final daskDateStr = _selectedDaskDate != null
           ? "${_selectedDaskDate!.year.toString().padLeft(4, '0')}-${_selectedDaskDate!.month.toString().padLeft(2, '0')}-${_selectedDaskDate!.day.toString().padLeft(2, '0')}"
           : (_daskController.text.trim().isNotEmpty ? _daskController.text.trim() : null);
@@ -90,7 +86,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         _cityController.text.trim(),
         userId,
         daskEndDate: daskDateStr,
-        depositAmount: depositAmount,
       );
 
       if (!mounted) return;
@@ -113,14 +108,20 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   InputDecoration _inputDecoration({
     required String label,
     required String hintText,
-    required IconData prefixIcon,
+    dynamic prefixIcon,
     required bool isDark,
+    bool alignLabelWithHint = false,
   }) {
+    final Widget? effectivePrefix = prefixIcon is Widget
+        ? prefixIcon
+        : (prefixIcon is IconData ? Icon(prefixIcon, color: vibrantBlue) : null);
+
     return InputDecoration(
       labelText: label,
       hintText: hintText,
-      prefixIcon: Icon(prefixIcon, color: vibrantBlue),
+      prefixIcon: effectivePrefix,
       filled: true,
+      alignLabelWithHint: alignLabelWithHint,
       fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       border: OutlineInputBorder(
@@ -219,8 +220,18 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                   decoration: _inputDecoration(
                     label: 'Adres',
                     hintText: 'Örn: Caferağa Mah. Moda Cad. No:12 D:4',
-                    prefixIcon: Icons.location_on_outlined,
+                    prefixIcon: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(top: 14.0),
+                          child: Icon(Icons.location_on, color: vibrantBlue),
+                        ),
+                      ],
+                    ),
                     isDark: isDark,
+                    alignLabelWithHint: true,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -255,17 +266,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     label: 'DASK Bitiş Tarihi',
                     hintText: 'Tarih seçiniz (YYYY-AA-GG)',
                     prefixIcon: Icons.calendar_month_outlined,
-                    isDark: isDark,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _depositController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _inputDecoration(
-                    label: 'Depozito Tutarı (TL)',
-                    hintText: 'Örn: 25000',
-                    prefixIcon: Icons.payments_outlined,
                     isDark: isDark,
                   ),
                 ),

@@ -85,7 +85,12 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       if (leases.isNotEmpty) {
         _activeLease = leases.first;
         final periods = await _rentPeriodService.getPeriodsForLease(_activeLease!.id);
-        _periods = periods;
+        _periods = periods.map((p) {
+          if (p.expectedAmount <= 0 && _activeLease!.rentAmount > 0) {
+            return p.copyWith(expectedAmount: _activeLease!.rentAmount);
+          }
+          return p;
+        }).toList();
       } else {
         _activeLease = null;
         _periods = [];
@@ -490,16 +495,48 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     );
   }
 
-  String _formatMonthYear(String dateStr) {
+  String _getMonthName(int month) {
+    switch (month) {
+      case 1:
+        return 'Ocak';
+      case 2:
+        return 'Şubat';
+      case 3:
+        return 'Mart';
+      case 4:
+        return 'Nisan';
+      case 5:
+        return 'Mayıs';
+      case 6:
+        return 'Haziran';
+      case 7:
+        return 'Temmuz';
+      case 8:
+        return 'Ağustos';
+      case 9:
+        return 'Eylül';
+      case 10:
+        return 'Ekim';
+      case 11:
+        return 'Kasım';
+      case 12:
+        return 'Aralık';
+      default:
+        return '';
+    }
+  }
+
+  String _formatMonthYear(dynamic date) {
     try {
-      final dt = DateTime.parse(dateStr);
-      const months = [
-        'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-        'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-      ];
-      return '${months[dt.month - 1]} ${dt.year}';
+      DateTime dt;
+      if (date is DateTime) {
+        dt = date;
+      } else {
+        dt = DateTime.parse(date.toString());
+      }
+      return '${_getMonthName(dt.month)} ${dt.year}';
     } catch (_) {
-      return dateStr;
+      return date?.toString() ?? '';
     }
   }
 
@@ -511,6 +548,90 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     } catch (_) {
       return '1 Yıl';
     }
+  }
+
+  Widget _buildDashboardGrid(bool isDark, Color textSecondary) {
+    if (_stats == null) return const SizedBox.shrink();
+
+    final upcoming = _periods
+        .where((p) =>
+            (p.status == 'PENDING' || p.status == 'OVERDUE') &&
+            (p.receiptImageUrl == null || p.receiptImageUrl!.isEmpty))
+        .toList();
+    upcoming.sort((a, b) {
+      if (a.periodStart == null && b.periodStart == null) return 0;
+      if (a.periodStart == null) return 1;
+      if (b.periodStart == null) return -1;
+      return a.periodStart!.compareTo(b.periodStart!);
+    });
+
+    final String nextPaymentAmount;
+    final String nextPaymentBadge;
+
+    if (upcoming.isNotEmpty) {
+      final firstUpcoming = upcoming.first;
+      final amount = firstUpcoming.expectedAmount > 0
+          ? firstUpcoming.expectedAmount
+          : (_activeLease?.rentAmount ?? 0.0);
+      nextPaymentAmount = '${amount.toStringAsFixed(0)} TL';
+      if (firstUpcoming.periodStart != null) {
+        nextPaymentBadge =
+            '${_getMonthName(firstUpcoming.periodStart!.month)} ${firstUpcoming.periodStart!.year} Kirası';
+      } else {
+        nextPaymentBadge = 'Bu Ay';
+      }
+    } else {
+      nextPaymentAmount = '0 TL';
+      nextPaymentBadge = 'Borç Yok';
+    }
+
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 14,
+      mainAxisSpacing: 14,
+      childAspectRatio: 1.25,
+      children: [
+        _buildSummaryCard(
+          title: 'Ödenen Kira',
+          amount: '${_stats!.totalPaid.toStringAsFixed(0)} TL',
+          badgeText: 'Toplam',
+          badgeBg: isDark ? const Color(0xFF064E3B) : const Color(0xFF047857),
+          badgeTextColor: Colors.white,
+          icon: Icons.check_circle_outline_rounded,
+          isPrimary: true,
+          isDark: isDark,
+        ),
+        _buildSummaryCard(
+          title: 'Sıradaki Ödeme',
+          amount: nextPaymentAmount,
+          badgeText: nextPaymentBadge,
+          badgeBg: isDark ? const Color(0xFF0F172A) : const Color(0xFFEFF6FF),
+          badgeTextColor: isDark ? accentBlue : const Color(0xFF1E50CE),
+          icon: Icons.schedule_rounded,
+          isDark: isDark,
+        ),
+        _buildSummaryCard(
+          title: 'Toplam Borç',
+          amount: '${(_stats!.upcoming + _stats!.overdue).toStringAsFixed(0)} TL',
+          badgeText: 'Aktif',
+          badgeBg: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+          badgeTextColor: textSecondary,
+          icon: Icons.receipt_long_rounded,
+          isDark: isDark,
+        ),
+        _buildSummaryCard(
+          title: 'Geciken Borç',
+          amount: '${_stats!.overdue.toStringAsFixed(0)} TL',
+          badgeText: 'Geciken',
+          badgeBg: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
+          badgeTextColor: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+          icon: Icons.warning_amber_rounded,
+          isDark: isDark,
+        ),
+      ],
+    );
   }
 
   Widget _buildSummaryCard({
@@ -931,12 +1052,10 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             if (hasReceipt) {
               return true;
             }
-            try {
-              final startDt = DateTime.parse(p.periodStart);
-              return startDt.isBefore(threshold);
-            } catch (_) {
-              return true;
+            if (p.periodStart != null) {
+              return p.periodStart!.isBefore(threshold);
             }
+            return true;
           }
 
           return false;
@@ -1566,54 +1685,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                       _buildPendingLeaseWarningCard(isDark),
                     ] else ...[
                       // 4 Summary Cards Grid
-                      if (_stats != null)
-                        GridView.count(
-                          crossAxisCount: 2,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: 1.25,
-                          children: [
-                            _buildSummaryCard(
-                              title: 'Ödenen Kira',
-                              amount: '${_stats!.totalPaid.toStringAsFixed(0)} TL',
-                              badgeText: 'Toplam',
-                              badgeBg: isDark ? const Color(0xFF064E3B) : const Color(0xFF047857),
-                              badgeTextColor: Colors.white,
-                              icon: Icons.check_circle_outline_rounded,
-                              isPrimary: true,
-                              isDark: isDark,
-                            ),
-                            _buildSummaryCard(
-                              title: 'Sıradaki Ödeme',
-                              amount: '${_stats!.upcoming.toStringAsFixed(0)} TL',
-                              badgeText: 'Bu Ay',
-                              badgeBg: isDark ? const Color(0xFF0F172A) : const Color(0xFFEFF6FF),
-                              badgeTextColor: isDark ? accentBlue : const Color(0xFF1E50CE),
-                              icon: Icons.schedule_rounded,
-                              isDark: isDark,
-                            ),
-                            _buildSummaryCard(
-                              title: 'Toplam Borç',
-                              amount: '${(_stats!.upcoming + _stats!.overdue).toStringAsFixed(0)} TL',
-                              badgeText: 'Aktif',
-                              badgeBg: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                              badgeTextColor: textSecondary,
-                              icon: Icons.receipt_long_rounded,
-                              isDark: isDark,
-                            ),
-                            _buildSummaryCard(
-                              title: 'Geciken Borç',
-                              amount: '${_stats!.overdue.toStringAsFixed(0)} TL',
-                              badgeText: 'Geciken',
-                              badgeBg: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
-                              badgeTextColor: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
-                              icon: Icons.warning_amber_rounded,
-                              isDark: isDark,
-                            ),
-                          ],
-                        ),
+                      _buildDashboardGrid(isDark, textSecondary),
 
                       const SizedBox(height: 24),
 
