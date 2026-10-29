@@ -35,6 +35,7 @@ public class LeaseService {
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
     private final FileStorageService fileStorageService;
+    private final EmailService emailService;
 
     @Transactional
     public LeaseAgreement createLease(LeaseRequest request) {
@@ -132,6 +133,8 @@ public class LeaseService {
         if (!periods.isEmpty()) {
             rentPeriodRepository.saveAll(periods);
         }
+
+        emailService.sendTenantInviteEmail(request.getTenantEmail(), request.getTenantName(), property.getTitle(), inviteCode);
 
         return savedLease;
     }

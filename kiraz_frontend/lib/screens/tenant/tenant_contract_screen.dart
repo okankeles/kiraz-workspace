@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../main.dart';
 import '../../models/lease.dart';
 import '../../services/lease_service.dart';
+import '../../widgets/cherry_logo.dart';
 
 class TenantContractScreen extends StatefulWidget {
   const TenantContractScreen({super.key});
@@ -16,6 +17,7 @@ class TenantContractScreen extends StatefulWidget {
 class _TenantContractScreenState extends State<TenantContractScreen> {
   static const Color accentBlue = Color(0xFF38BDF8);
   static const Color primaryBlue = Color(0xFF1E50CE);
+  static const Color vibrantBlue = Color(0xFF2563EB);
 
   final LeaseService _leaseService = LeaseService();
   Lease? _activeLease;
@@ -619,19 +621,8 @@ class _TenantContractScreenState extends State<TenantContractScreen> {
         titleSpacing: 20,
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: accentBlue.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.home_rounded,
-                color: accentBlue,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 10),
+            const CherryLogo(size: 28, color: vibrantBlue),
+            const SizedBox(width: 8),
             Text(
               'kiraZ',
               style: GoogleFonts.poppins(
