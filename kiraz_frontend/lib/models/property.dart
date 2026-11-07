@@ -47,5 +47,7 @@ class Property {
       depositAmount: parseAmount(json['depositAmount'] ?? json['deposit']),
     );
   }
+
+  bool get isOccupied => tenantName != null && tenantName!.trim().isNotEmpty;
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../agent/agent_dashboard_screen.dart';
 import '../auth/login_screen.dart';
 import '../landlord/landlord_main_screen.dart';
 import '../tenant/tenant_main_screen.dart';
@@ -31,7 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _fullName = prefs.getString('fullName') ?? 'Kullanıcı';
-      _userRole = prefs.getString('role') ?? '';
+      _userRole = (prefs.getString('role') ?? '').toUpperCase();
       _isLoading = false;
     });
   }
@@ -51,6 +52,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_userRole == 'AGENT') {
+      return const AgentDashboardScreen();
     }
 
     if (_userRole == 'LANDLORD') {
@@ -77,6 +82,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
+    }
+
+    if (_userRole == 'AGENT') {
+      return const AgentDashboardScreen();
     }
 
     if (_userRole == 'LANDLORD') {

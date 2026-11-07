@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../main.dart';
 import '../../models/dashboard_stats.dart';
+import '../../models/lease.dart';
 import '../../models/notification_model.dart';
 import '../../models/pending_approval_item.dart';
 import '../../services/dashboard_service.dart';
@@ -40,6 +41,8 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
   List<AppNotification> _notifications = [];
   int _unreadNotificationsCount = 0;
   List<PendingApprovalItem> _pendingApprovals = [];
+  List<Lease> _pendingLeases = [];
+  int? _userId;
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -63,12 +66,14 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
       final prefs = await SharedPreferences.getInstance();
       _userName = prefs.getString('fullName') ?? 'Ev Sahibi';
       final userId = prefs.getInt('userId');
+      _userId = userId;
 
       if (userId != null) {
         final results = await Future.wait([
           _dashboardService.getLandlordStats(userId),
           _notificationService.getUnreadNotifications(userId),
           _rentPeriodService.getPendingApprovalsForLandlord(userId),
+          _leaseService.getPendingApprovalsForLandlord(userId).catchError((_) => <Lease>[]),
         ]);
 
         if (!mounted) return;
@@ -77,6 +82,7 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
           _notifications = results[1] as List<AppNotification>;
           _unreadNotificationsCount = _notifications.length;
           _pendingApprovals = results[2] as List<PendingApprovalItem>;
+          _pendingLeases = results[3] as List<Lease>;
           _isLoading = false;
         });
       } else {
@@ -609,9 +615,20 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                               ],
                             ),
                           ),
-                          IconButton(
-                            onPressed: () => Navigator.pop(dialogContext),
-                            icon: Icon(Icons.close, color: isDark ? Colors.white70 : Colors.black54),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                onPressed: () {},
+                                icon: Icon(Icons.download_rounded, color: isDark ? Colors.white70 : Colors.black54),
+                                tooltip: 'İndir',
+                              ),
+                              IconButton(
+                                onPressed: () => Navigator.pop(dialogContext),
+                                icon: Icon(Icons.close, color: isDark ? Colors.white70 : Colors.black54),
+                                tooltip: 'Kapat',
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -886,6 +903,347 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
     );
   }
 
+  Future<void> _approvePendingLease(Lease lease) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sözleşmeyi Onayla'),
+        content: Text(
+          'Emlakçı (${lease.createdByName ?? 'Agent'}) tarafından oluşturulan bu sözleşmeyi onaylayıp aktif duruma getirmek istiyor musunuz?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+            child: const Text('Onayla'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _leaseService.approveLease(lease.id, landlordId: _userId);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sözleşme başarıyla onaylandı ve aktifleşti!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _loadDashboardData();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hata: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _rejectPendingLease(Lease lease) async {
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sözleşmeyi Reddet'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Bu sözleşmeyi reddetmek istediğinize emin misiniz?'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Ret Gerekçesi (Zorunlu)',
+                hintText: 'Örn: Kira tutarı veya şartlar uygun değil',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (reasonController.text.trim().isEmpty) return;
+              Navigator.pop(ctx, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Reddet'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _leaseService.rejectLease(lease.id, landlordId: _userId, reason: reasonController.text.trim());
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sözleşme reddedildi.'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _loadDashboardData();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hata: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildPendingLeaseApprovalsSection(bool isDark) {
+    final textColor = isDark ? Colors.white : darkNavy;
+    final cardBg = isDark ? darkCardBg : Colors.white;
+    final borderColor = isDark ? darkCardBorder : cardBorder;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Onay Bekleyen İşlemler',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+                if (_pendingLeases.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD97706),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_pendingLeases.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_pendingLeases.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Emlakçılardan onay bekleyen yeni sözleşme bulunmuyor.',
+                    style: GoogleFonts.inter(fontSize: 14, color: textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _pendingLeases.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final lease = _pendingLeases[index];
+              return Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.15) : const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5), width: 1.2),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.description_outlined, color: Color(0xFFD97706), size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                lease.propertyName != null && lease.propertyName!.isNotEmpty
+                                    ? lease.propertyName!
+                                    : 'Mülk #${lease.propertyId}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Ekleyen Emlakçı: ${lease.createdByName ?? 'Yetkili Emlak Danışmanı'}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFFD97706),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Onay Bekliyor',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Kiracı', style: TextStyle(fontSize: 11, color: textSecondary)),
+                              Text(
+                                lease.tenantName ?? '-',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Aylık Kira', style: TextStyle(fontSize: 11, color: textSecondary)),
+                              Text(
+                                '${lease.rentAmount.toStringAsFixed(0)} TL',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Başlangıç', style: TextStyle(fontSize: 11, color: textSecondary)),
+                              Text(
+                                lease.startDate,
+                                style: TextStyle(fontSize: 13, color: textColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _rejectPendingLease(lease),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Reddet', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _approvePendingLease(lease),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Onayla (Aktif)', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
   Widget _buildPendingApprovalsSection(bool isDark) {
     final textColor = isDark ? Colors.white : darkNavy;
     final cardBg = isDark ? darkCardBg : Colors.white;
@@ -1134,16 +1492,46 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                   : ThemeMode.light;
             },
           ),
-          Badge(
-            isLabelVisible: _unreadNotificationsCount > 0,
-            label: Text('$_unreadNotificationsCount'),
-            child: IconButton(
-              tooltip: 'Bildirimler',
-              icon: Icon(
-                Icons.notifications,
-                color: _unreadNotificationsCount > 0 ? Colors.red : null,
-              ),
-              onPressed: () => _showNotificationsDialog(isDark),
+          IconButton(
+            tooltip: 'Bildirimler',
+            onPressed: () => _showNotificationsDialog(isDark),
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  Icons.notifications_outlined,
+                  color: textColor,
+                  size: 24,
+                ),
+                if (_unreadNotificationsCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        _unreadNotificationsCount > 99
+                            ? '99+'
+                            : '$_unreadNotificationsCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1.0,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(width: 8),
@@ -1282,6 +1670,11 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
 
                     // DASK Policy Alert Card
                     _buildDaskAlertCard(isDark),
+
+                    const SizedBox(height: 24),
+
+                    // Maker-Checker: Onay Bekleyen Sözleşmeler
+                    _buildPendingLeaseApprovalsSection(isDark),
 
                     const SizedBox(height: 24),
 

@@ -7,6 +7,10 @@ class Lease {
   final String? propertyName;
   final String? propertyAddress;
   final String? status;
+  final String? approvalStatus;
+  final String? createdByName;
+  final String? createdByRole;
+  final String? rejectionReason;
   final String? inviteCode;
   final String? contractFileUrl;
   final String? tenantName;
@@ -25,6 +29,10 @@ class Lease {
     this.propertyName,
     this.propertyAddress,
     this.status,
+    this.approvalStatus,
+    this.createdByName,
+    this.createdByRole,
+    this.rejectionReason,
     this.inviteCode,
     this.contractFileUrl,
     this.tenantName,
@@ -34,6 +42,30 @@ class Lease {
     this.landlordName,
     this.landlordEmail,
   });
+
+  bool get isPendingLandlordApproval =>
+      approvalStatus?.toUpperCase() == 'PENDING_LANDLORD_APPROVAL';
+
+  bool get isRejected => approvalStatus?.toUpperCase() == 'REJECTED';
+
+  bool get isApprovedOrActive =>
+      approvalStatus?.toUpperCase() == 'ACTIVE' ||
+      (status?.toUpperCase() == 'ACTIVE' && !isPendingLandlordApproval);
+
+  String get approvalStatusDisplay {
+    switch (approvalStatus?.toUpperCase()) {
+      case 'PENDING_LANDLORD_APPROVAL':
+        return 'Ev Sahibi Onayı Bekliyor';
+      case 'ACTIVE':
+        return 'Onaylandı / Aktif';
+      case 'REJECTED':
+        return 'Reddedildi';
+      case 'TERMINATED':
+        return 'Sonlandırıldı';
+      default:
+        return status ?? 'Bekliyor';
+    }
+  }
 
   factory Lease.fromJson(Map<String, dynamic> json) {
     int parseId(dynamic value, [dynamic nested]) {
@@ -84,6 +116,15 @@ class Lease {
       lEmail = json['landlordEmail']?.toString();
     }
 
+    String? creatorName = json['createdByName']?.toString();
+    String? creatorRole = json['createdByRole']?.toString();
+    if (json['createdBy'] is Map) {
+      creatorName ??= json['createdBy']['fullName']?.toString();
+      creatorRole ??= json['createdBy']['role']?.toString();
+    }
+
+    final rawApprovalStatus = json['approvalStatus'] ?? json['approvalStatusName'];
+
     return Lease(
       id: parseId(json['id']),
       propertyId: parseId(json['propertyId'], json['property']),
@@ -93,6 +134,10 @@ class Lease {
       propertyName: propName,
       propertyAddress: propAddr,
       status: json['status']?.toString(),
+      approvalStatus: rawApprovalStatus?.toString(),
+      createdByName: creatorName,
+      createdByRole: creatorRole,
+      rejectionReason: json['rejectionReason']?.toString(),
       inviteCode: json['inviteCode']?.toString(),
       contractFileUrl: json['contractFileUrl']?.toString(),
       tenantName: tName,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/lease_service.dart';
 
@@ -97,6 +98,10 @@ class _AssignTenantScreenState extends State<AssignTenantScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final userRole = (prefs.getString('role') ?? '').toUpperCase();
+      final isAgent = userRole == 'AGENT';
+
       final lease = await LeaseService().createLease(
         widget.propertyId,
         tenantName,
@@ -109,22 +114,89 @@ class _AssignTenantScreenState extends State<AssignTenantScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogCtx) => AlertDialog(
-          title: const Text('Sözleşme Oluşturuldu'),
-          content: SelectableText(
-            'Sözleşme oluşturuldu! Kiracınıza şu davet kodunu iletin: ${lease.inviteCode ?? ''}',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Tamam'),
+      if (isAgent || lease.isPendingLandlordApproval) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => AlertDialog(
+            icon: const Icon(Icons.schedule_send_rounded, color: Color(0xFFD97706), size: 48),
+            title: Text(
+              'Onaya Gönderildi',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
             ),
-          ],
-        ),
-      );
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sözleşme emlakçı hesabınız tarafından oluşturuldu ve mülk sahibinin (Ev Sahibi) onayına iletildi.',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFF59E0B)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Kiracı Davet Kodu:',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                      ),
+                      const SizedBox(height: 4),
+                      SelectableText(
+                        lease.inviteCode ?? '-',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Not: Ev sahibi onayladığında sözleşme aktifleşecektir.',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF92400E)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('Tamam'),
+              ),
+            ],
+          ),
+        );
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sözleşme başarıyla ev sahibi onayına gönderildi!'),
+            backgroundColor: Color(0xFFD97706),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => AlertDialog(
+            title: const Text('Sözleşme Oluşturuldu'),
+            content: SelectableText(
+              'Sözleşme oluşturuldu! Kiracınıza şu davet kodunu iletin: ${lease.inviteCode ?? ''}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('Tamam'),
+              ),
+            ],
+          ),
+        );
+      }
 
       if (!mounted) return;
       Navigator.pop(context, true);

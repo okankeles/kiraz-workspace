@@ -149,7 +149,18 @@ class RoleSelectionScreen extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // Card 2: Kiracı
+                  // Card 2: Emlak Danışmanı (AGENT)
+                  _buildRoleCard(
+                    context: context,
+                    icon: Icons.real_estate_agent_rounded,
+                    title: 'Emlak Danışmanı (Agent)',
+                    subtitle: 'Yetkilendirildiğim portföyü ve sözleşmeleri yönetmek istiyorum.',
+                    onTap: () => _navigateToAuth(context, 'AGENT'),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Card 3: Kiracı
                   _buildRoleCard(
                     context: context,
                     icon: Icons.person_rounded,

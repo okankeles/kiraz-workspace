@@ -223,6 +223,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     prefixIcon: const Column(
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
                           padding: EdgeInsets.only(top: 14.0),

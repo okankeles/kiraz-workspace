@@ -22,6 +22,35 @@ class RentPeriod {
     return "${periodStart!.year}-${periodStart!.month.toString().padLeft(2, '0')}-${periodStart!.day.toString().padLeft(2, '0')}";
   }
 
+  bool get isPaid {
+    final s = status.toUpperCase();
+    return s == 'PAID' || s == 'ÖDENDİ' || s == 'ODENDI';
+  }
+
+  bool get isOverdue {
+    final s = status.toUpperCase();
+    return s == 'OVERDUE' || s == 'GECİKTİ' || s == 'GECIKTI';
+  }
+
+  bool get isInLegalProcess {
+    final s = status.toUpperCase();
+    return s == 'IN_LEGAL_PROCESS' ||
+        s == 'LEGAL_PROCESS' ||
+        s == 'HUKUKİ SÜREÇTE' ||
+        s == 'HUKUKI SURECTE' ||
+        s == 'AVUKATTA';
+  }
+
+  bool get isRejected {
+    final s = status.toUpperCase();
+    return s == 'REJECTED' || s == 'REDDEDİLDİ' || s == 'REDDEDILDI';
+  }
+
+  bool get isPending {
+    final s = status.toUpperCase();
+    return s == 'PENDING' || s == 'BEKLİYOR' || s == 'BEKLIYOR';
+  }
+
   RentPeriod copyWith({
     int? id,
     DateTime? periodStart,

@@ -5,6 +5,19 @@ import '../models/property.dart';
 import '../utils/constants.dart';
 
 class PropertyService {
+  Future<Map<String, String>> _getHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('userId');
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (userId != null) {
+      headers['X-User-Id'] = userId.toString();
+      headers['Authorization'] = 'Bearer $userId';
+    }
+    return headers;
+  }
+
   Future<List<Property>> getProperties({int? landlordId}) async {
     int? targetLandlordId = landlordId;
     if (targetLandlordId == null) {
@@ -16,11 +29,10 @@ class PropertyService {
         ? Uri.parse('${ApiConstants.baseUrl}/properties?landlordId=$targetLandlordId')
         : Uri.parse('${ApiConstants.baseUrl}/properties');
 
+    final headers = await _getHeaders();
+
     try {
-      final response = await http.get(
-        url,
-        headers: {'Content-Type': 'application/json'},
-      );
+      final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
         final dynamic data = json.decode(utf8.decode(response.bodyBytes));
@@ -35,6 +47,29 @@ class PropertyService {
       }
     } catch (e) {
       throw Exception('Mülk listesi alınırken hata oluştu: $e');
+    }
+  }
+
+  Future<List<Property>> getPropertiesForAgent(int agentId) async {
+    final url = Uri.parse('${ApiConstants.baseUrl}/properties/agent/$agentId');
+    final headers = await _getHeaders();
+
+    try {
+      final response = await http.get(url, headers: headers);
+
+      if (response.statusCode == 200) {
+        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+        if (data is List) {
+          return data
+              .map((item) => Property.fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
+        return [];
+      } else {
+        throw Exception('Emlakçı mülkleri yüklenemedi: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Emlakçı mülkleri alınırken hata oluştu: $e');
     }
   }
 
@@ -61,11 +96,13 @@ class PropertyService {
       payload['depositAmount'] = depositAmount;
     }
 
+    final headers = await _getHeaders();
+
     final http.Response response;
     try {
       response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: json.encode(payload),
       );
     } catch (e) {

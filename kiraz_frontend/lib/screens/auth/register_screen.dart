@@ -27,6 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _referenceCodeController = TextEditingController();
 
   late String _selectedRole;
   bool _obscurePassword = true;
@@ -44,6 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _referenceCodeController.dispose();
     super.dispose();
   }
 
@@ -63,6 +65,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'role': _selectedRole,
     };
 
+    final refCode = _referenceCodeController.text.trim().toUpperCase();
+    if (refCode.isNotEmpty && (_selectedRole == 'AGENT' || _selectedRole == 'TENANT')) {
+      userData['referenceCode'] = refCode;
+    }
+
     try {
       final response = await authService.register(userData);
 
@@ -70,9 +77,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => _isLoading = false);
 
       if (response != null) {
-        final successMessage = _selectedRole == 'LANDLORD'
-            ? 'Kayıt başarılı! Referans Kodunuz: ${response.referenceCode}'
-            : 'Kayıt başarılı! Giriş yapabilirsiniz.';
+        String successMessage = 'Kayıt başarılı! Giriş yapabilirsiniz.';
+        if (response.referenceCode.isNotEmpty && (_selectedRole == 'LANDLORD' || _selectedRole == 'AGENT')) {
+          successMessage = 'Kayıt başarılı! Referans Kodunuz: ${response.referenceCode}';
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -117,10 +125,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required bool isDark,
     Widget? suffixIcon,
     String? hintText,
+    String? helperText,
   }) {
     return InputDecoration(
       labelText: label,
       hintText: hintText,
+      helperText: helperText,
+      helperMaxLines: 2,
       prefixIcon: Icon(prefixIcon, color: vibrantBlue),
       suffixIcon: suffixIcon,
       filled: true,
@@ -215,6 +226,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           value: 'LANDLORD',
                           label: Text('Ev Sahibi'),
                           icon: Icon(Icons.home_work_outlined),
+                        ),
+                        ButtonSegment<String>(
+                          value: 'AGENT',
+                          label: Text('Emlakçı'),
+                          icon: Icon(Icons.real_estate_agent_outlined),
                         ),
                         ButtonSegment<String>(
                           value: 'TENANT',
@@ -327,7 +343,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+
+                  // Referans Kodu: Emlakçı ve Kiracı rolleri için
+                  if (_selectedRole == 'AGENT' || _selectedRole == 'TENANT') ...[
+                    TextFormField(
+                      controller: _referenceCodeController,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: _inputDecoration(
+                        label: 'Referans Kodu',
+                        hintText: _selectedRole == 'AGENT' ? 'Örn: AGT-A1B2C3' : 'Örn: REF-123456',
+                        helperText: _selectedRole == 'AGENT'
+                            ? 'Ev sahibinizin ilettiği yetkilendirme davet kodu varsa giriniz (isteğe bağlı)'
+                            : 'Ev sahibinizin ilettiği davet kodunu giriniz (isteğe bağlı)',
+                        prefixIcon: Icons.vpn_key_outlined,
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Submit Button
                   ElevatedButton(

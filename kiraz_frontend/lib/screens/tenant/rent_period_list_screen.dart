@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/lease.dart';
@@ -32,17 +33,39 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
   static const Color darkNavy = Color(0xFF161F33);
   static const Color vibrantBlue = Color(0xFF2563EB);
   static const Color subtleBorder = Color(0xFFE5E0D8);
+  static const Color legalBurgundy = Color(0xFF881337);
+  static const Color legalBurgundyBg = Color(0xFFFFF1F2);
+  static const Color legalBurgundyDarkBg = Color(0xFF4C0519);
+  static const Color overdueRed = Color(0xFFDC2626);
+  static const Color overdueRedBg = Color(0xFFFEF2F2);
 
   final RentPeriodService _rentPeriodService = RentPeriodService();
   List<RentPeriod> _periods = [];
   bool _isLoading = true;
   String? _errorMessage;
   int? _uploadingPeriodId;
+  String _userRole = 'LANDLORD';
+  int? _currentUserId;
+
+  bool get _isManager =>
+      widget.effectiveIsLandlord ||
+      _userRole == 'LANDLORD' ||
+      _userRole == 'AGENT';
 
   @override
   void initState() {
     super.initState();
+    _loadUserRole();
     _fetchPeriods();
+  }
+
+  Future<void> _loadUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _userRole = prefs.getString('user_role') ?? (widget.isLandlord ? 'LANDLORD' : 'TENANT');
+      _currentUserId = prefs.getInt('userId');
+    });
   }
 
   Future<void> _fetchPeriods() async {
@@ -55,7 +78,12 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
       final periods = await _rentPeriodService.getPeriodsForLease(widget.effectiveLeaseId);
       if (!mounted) return;
       setState(() {
-        _periods = periods;
+        _periods = periods.map((p) {
+          if (p.expectedAmount <= 0 && widget.lease != null && widget.lease!.rentAmount > 0) {
+            return p.copyWith(expectedAmount: widget.lease!.rentAmount);
+          }
+          return p;
+        }).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -135,6 +163,222 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
     }
   }
 
+  Future<void> _showInitiateLegalProcessDialog(RentPeriod period) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final notesController = TextEditingController();
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: legalBurgundy.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.gavel_rounded,
+                      color: legalBurgundy,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Hukuki Süreci Başlat',
+                      style: GoogleFonts.poppins(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : darkNavy,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Bu işlem kira kaydını "Hukuki Süreçte / Avukatta" statüsüne geçirecektir. Kiracıya resmi ihtar ve icra takibi sürecinin başladığı bildirilecektir.',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                color: isDark ? Colors.grey.shade300 : Colors.grey.shade800,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Dönem: ${period.periodStartFormatted} - ${period.periodEnd}',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.grey.shade300 : Colors.grey.shade800,
+                      ),
+                    ),
+                    if (period.expectedAmount > 0) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Kira Tutarı: ₺${period.expectedAmount.toStringAsFixed(0)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: legalBurgundy,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Text(
+                      'Hukuki İşlem / İhtar Notu (İsteğe bağlı):',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: notesController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Örn: Noter aracılığıyla 1. ihtarname gönderildi, icra dosya no: 2026/...',
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                      ),
+                      style: GoogleFonts.inter(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.of(dialogCtx).pop(),
+                  child: Text(
+                    'Vazgeç',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          setDialogState(() => isSubmitting = true);
+                          try {
+                            await _rentPeriodService.initiateLegalProcess(
+                              period.id,
+                              userId: _currentUserId,
+                              notes: notesController.text.trim().isNotEmpty
+                                  ? notesController.text.trim()
+                                  : null,
+                            );
+                            if (!dialogCtx.mounted) return;
+                            Navigator.of(dialogCtx).pop();
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Hukuki süreç başarıyla başlatıldı ve dosya takibe alındı.'),
+                                backgroundColor: legalBurgundy,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            _fetchPeriods();
+                          } catch (e) {
+                            setDialogState(() => isSubmitting = false);
+                            if (!dialogCtx.mounted) return;
+                            ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                              SnackBar(
+                                content: Text('Hata: $e'),
+                                backgroundColor: Colors.red.shade700,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: legalBurgundy,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.gavel_rounded, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Süreci Başlat',
+                              style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showReceiptDialog(RentPeriod period) {
     final isPaid = _isPaid(period.status);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -176,362 +420,439 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                       IconButton(
                         onPressed: () => Navigator.of(dialogContext).pop(),
                         icon: const Icon(Icons.close),
+                        tooltip: 'Kapat',
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
                     ],
                   ),
-                      const SizedBox(height: 16),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          constraints: const BoxConstraints(maxHeight: 350),
-                          color: Colors.black.withValues(alpha: 0.04),
-                          child: isPdf
-                              ? Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withValues(alpha: 0.12),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.picture_as_pdf,
-                                          size: 52,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 14),
-                                      Text(
-                                        'PDF Formatında Dekont',
-                                        style: GoogleFonts.poppins(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: isDark ? Colors.white : Colors.black87,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        'Dekont belgesini cihazınızda görüntüleyin veya indirin.',
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 13,
-                                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 18),
-                                      ElevatedButton.icon(
-                                        onPressed: () async {
-                                          try {
-                                            final uri = Uri.parse(fullImageUrl);
-                                            if (await canLaunchUrl(uri)) {
-                                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                            } else {
-                                              await launchUrl(uri);
-                                            }
-                                          } catch (e) {
-                                            if (!dialogContext.mounted) return;
-                                            ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                              SnackBar(
-                                                content: Text('Dosya açılamadı: $e'),
-                                                backgroundColor: Colors.red,
-                                              ),
-                                            );
-                                          }
-                                        },
-                                        icon: const Icon(Icons.open_in_new, size: 18),
-                                        label: const Text('PDF Olarak İndir/Görüntüle'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF2563EB),
-                                          foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                          elevation: 0,
-                                        ),
-                                      ),
-                                    ],
+                  const SizedBox(height: 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 350),
+                      color: Colors.black.withValues(alpha: 0.04),
+                      child: isPdf
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.picture_as_pdf,
+                                      size: 52,
+                                      color: Colors.red,
+                                    ),
                                   ),
-                                )
-                              : (rawUrl.isNotEmpty
-                                  ? Image.network(
-                                      fullImageUrl,
-                                      fit: BoxFit.contain,
-                                      loadingBuilder:
-                                          (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        final total =
-                                            loadingProgress.expectedTotalBytes;
-                                        final loaded = loadingProgress
-                                            .cumulativeBytesLoaded;
-                                        return Container(
-                                          height: 200,
-                                          alignment: Alignment.center,
-                                          child: CircularProgressIndicator(
-                                            value: total != null
-                                                ? loaded / total
-                                                : null,
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    'PDF Formatında Dekont',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: isDark ? Colors.white : Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Dekont belgesini cihazınızda görüntüleyin veya indirin.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      try {
+                                        final uri = Uri.parse(fullImageUrl);
+                                        if (await canLaunchUrl(uri)) {
+                                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        } else {
+                                          await launchUrl(uri);
+                                        }
+                                      } catch (e) {
+                                        if (!dialogContext.mounted) return;
+                                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Dosya açılamadı: $e'),
+                                            backgroundColor: Colors.red,
                                           ),
                                         );
-                                      },
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          height: 160,
-                                          alignment: Alignment.center,
-                                          padding: const EdgeInsets.all(16),
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              const Icon(
-                                                Icons.broken_image_outlined,
-                                                size: 40,
-                                                color: Colors.grey,
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                'Görsel yüklenemedi',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade600,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    )
-                                  : const SizedBox(
-                                      height: 120,
-                                      child: Center(
-                                        child: Text('Kayıtlı dekont görseli yok'),
+                                      }
+                                    },
+                                    icon: const Icon(Icons.open_in_new, size: 18),
+                                    label: const Text('PDF Olarak İndir/Görüntüle'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: vibrantBlue,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
-                                    )),
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                      elevation: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : (rawUrl.isNotEmpty
+                              ? Image.network(
+                                  fullImageUrl,
+                                  fit: BoxFit.contain,
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    final total = loadingProgress.expectedTotalBytes;
+                                    final loaded = loadingProgress.cumulativeBytesLoaded;
+                                    return Container(
+                                      height: 200,
+                                      alignment: Alignment.center,
+                                      child: CircularProgressIndicator(
+                                        value: total != null ? loaded / total : null,
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      height: 160,
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.broken_image_outlined,
+                                            size: 40,
+                                            color: Colors.grey,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Görsel yüklenemedi',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                )
+                              : const SizedBox(
+                                  height: 120,
+                                  child: Center(
+                                    child: Text('Kayıtlı dekont görseli yok'),
+                                  ),
+                                )),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (isPaid) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.green.withValues(alpha: 0.3),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      if (isPaid) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            color: Colors.green,
+                            size: 20,
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: Colors.green.withValues(alpha: 0.3),
+                          SizedBox(width: 8),
+                          Text(
+                            'Bu ödeme onaylanmıştır',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
                             ),
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                color: Colors.green,
-                                size: 20,
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark
+                            ? const Color(0xFF334155)
+                            : Colors.grey.shade200,
+                        foregroundColor: isDark ? Colors.white : Colors.black87,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Kapat',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ] else if (_isManager) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.of(dialogContext).pop();
+                              _updatePeriodStatus(period, 'REJECTED');
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
                               ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Bu ödeme onaylanmıştır',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                            ],
+                            ),
+                            child: const Text(
+                              'Reddet',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () => Navigator.of(dialogContext).pop(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isDark
-                                ? const Color(0xFF334155)
-                                : Colors.grey.shade200,
-                            foregroundColor:
-                                isDark ? Colors.white : Colors.black87,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Text(
-                            'Kapat',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ] else if (widget.effectiveIsLandlord) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  Navigator.of(dialogContext).pop();
-                                  _updatePeriodStatus(period, 'REJECTED');
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                  side: const BorderSide(color: Colors.red),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Reddet',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold),
-                                ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(dialogContext).pop();
+                              _updatePeriodStatus(period, 'PAID');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.of(dialogContext).pop();
-                                  _updatePeriodStatus(period, 'PAID');
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  elevation: 0,
-                                ),
-                                child: const Text(
-                                  'Onayla',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold),
-                                ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
+                              elevation: 0,
                             ),
-                          ],
-                        ),
-                      ] else ...[
-                        ElevatedButton(
-                          onPressed: () => Navigator.of(dialogContext).pop(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isDark
-                                ? const Color(0xFF334155)
-                                : Colors.grey.shade200,
-                            foregroundColor:
-                                isDark ? Colors.white : Colors.black87,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                            child: const Text(
+                              'Onayla',
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
-                          ),
-                          child: const Text(
-                            'Kapat',
-                            style: TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],
+                    ),
+                    if (period.isOverdue) ...[
+                      const SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          _showInitiateLegalProcessDialog(period);
+                        },
+                        icon: const Icon(Icons.gavel_rounded, size: 16),
+                        label: const Text('Hukuki Süreci Başlat'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: legalBurgundy,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
                     ],
-                  ),
-                ),
+                  ] else ...[
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark
+                            ? const Color(0xFF334155)
+                            : Colors.grey.shade200,
+                        foregroundColor: isDark ? Colors.white : Colors.black87,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Kapat',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            );
-          },
-        );
-      }
-
-  String _formatStatus(String status) {
-    switch (status.toUpperCase()) {
-      case 'PAID':
-      case 'ODENDI':
-      case 'ÖDENDİ':
-        return 'ÖDENDİ';
-      case 'PENDING':
-      case 'BEKLIYOR':
-      case 'BEKLİYOR':
-        return 'BEKLİYOR';
-      case 'REJECTED':
-      case 'REDDEDILDI':
-      case 'REDDEDİLDİ':
-        return 'Reddedildi';
-      case 'OVERDUE':
-      case 'GECIKTI':
-      case 'GECİKTİ':
-        return 'GECİKTİ';
-      default:
-        return status.toUpperCase();
-    }
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'PAID':
-      case 'ODENDI':
-      case 'ÖDENDİ':
-        return Colors.green;
-      case 'PENDING':
-      case 'BEKLIYOR':
-      case 'BEKLİYOR':
-        return Colors.orange.shade800;
-      case 'REJECTED':
-      case 'REDDEDILDI':
-      case 'REDDEDİLDİ':
-        return Colors.red;
-      case 'OVERDUE':
-      case 'GECIKTI':
-      case 'GECİKTİ':
-        return Colors.red;
-      default:
-        return Colors.grey.shade700;
-    }
-  }
-
-  Widget _buildStatusBadge(String status) {
-    final s = status.toUpperCase();
-    if (s == 'REJECTED' || s == 'REDDEDİLDİ' || s == 'REDDEDILDI') {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Text(
-          'Reddedildi',
-          style: TextStyle(
-            color: Colors.red,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusBadge(RentPeriod period, bool isDark) {
+    if (period.isInLegalProcess) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isDark ? legalBurgundyDarkBg.withValues(alpha: 0.6) : legalBurgundyBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: legalBurgundy,
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.gavel_rounded, size: 13, color: legalBurgundy),
+            const SizedBox(width: 5),
+            Text(
+              'Hukuki Süreçte / Avukatta',
+              style: GoogleFonts.inter(
+                color: isDark ? const Color(0xFFFDA4AF) : legalBurgundy,
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       );
     }
-    final statusColor = _getStatusColor(status);
-    final statusLabel = _formatStatus(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: statusColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        statusLabel,
-        style: TextStyle(
-          color: statusColor,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
+
+    if (period.isOverdue) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : overdueRedBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: overdueRed,
+            width: 1.2,
+          ),
         ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.warning_amber_rounded, size: 13, color: overdueRed),
+            const SizedBox(width: 4),
+            Text(
+              'Gecikmede',
+              style: GoogleFonts.inter(
+                color: isDark ? const Color(0xFFFCA5A5) : overdueRed,
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (period.isPaid) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0),
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_rounded,
+              size: 13,
+              color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Ödendi',
+              style: GoogleFonts.inter(
+                color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (period.isRejected) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cancel_outlined, size: 13, color: Colors.red),
+            const SizedBox(width: 4),
+            Text(
+              'Reddedildi',
+              style: GoogleFonts.inter(
+                color: Colors.red,
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.4) : const Color(0xFFFEF3C7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.hourglass_empty_rounded,
+            size: 13,
+            color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Bekliyor',
+            style: GoogleFonts.inter(
+              color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+              fontSize: 11.5,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -626,10 +947,14 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                             side: BorderSide(
-                              color: isDark
-                                  ? const Color(0xFF334155)
-                                  : subtleBorder,
-                              width: 1.2,
+                              color: period.isInLegalProcess
+                                  ? legalBurgundy.withValues(alpha: 0.6)
+                                  : (period.isOverdue
+                                      ? overdueRed.withValues(alpha: 0.4)
+                                      : (isDark
+                                          ? const Color(0xFF334155)
+                                          : subtleBorder)),
+                              width: period.isInLegalProcess || period.isOverdue ? 1.5 : 1.2,
                             ),
                           ),
                           child: Padding(
@@ -641,31 +966,219 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.calendar_month_outlined,
-                                          size: 20,
-                                          color: isDark
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.calendar_month_outlined,
+                                            size: 20,
+                                            color: isDark
                                               ? Colors.grey.shade400
                                               : Colors.grey.shade600,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              dateDisplay,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: textColor,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _buildStatusBadge(period, isDark),
+                                  ],
+                                ),
+                                if (period.expectedAmount > 0) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Kira Tutarı: ',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          dateDisplay,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: textColor,
+                                      ),
+                                      Text(
+                                        '₺${period.expectedAmount.toStringAsFixed(0)}',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: period.isInLegalProcess
+                                              ? legalBurgundy
+                                              : (period.isOverdue
+                                                  ? overdueRed
+                                                  : (isDark ? Colors.white : darkNavy)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+
+                                // Status informative notices
+                                if (period.isInLegalProcess) ...[
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 12),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? legalBurgundyDarkBg.withValues(alpha: 0.4)
+                                          : legalBurgundyBg,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: legalBurgundy.withValues(alpha: 0.5),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: legalBurgundy.withValues(alpha: 0.15),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.gavel_rounded,
+                                            size: 16,
+                                            color: legalBurgundy,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Hukuki Süreç & Avukatlık Takibi',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isDark ? const Color(0xFFFDA4AF) : legalBurgundy,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                _isManager
+                                                    ? 'Bu kira borcu için yasal icra ve avukatlık takibi aktif durumdadır.'
+                                                    : 'Bu kira borcunuz için ev sahibi/emlakçı tarafından hukuki süreç ve icra takibi başlatılmıştır. Lütfen kiralayan veya temsilcisiyle ivedilikle iletişime geçiniz.',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 11.5,
+                                                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                                                  height: 1.3,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
-                                    _buildStatusBadge(period.status),
+                                  ),
+                                ] else if (period.isOverdue) ...[
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 12),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF7F1D1D).withValues(alpha: 0.25)
+                                          : overdueRedBg,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: overdueRed.withValues(alpha: 0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.warning_amber_rounded,
+                                          size: 16,
+                                          color: overdueRed,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            _isManager
+                                                ? 'Ödeme vadesi geçmiş ve gecikmededir.'
+                                                : 'Kira ödemesi gecikmiştir. Lütfen ödemenizi yapıp dekont yükleyiniz.',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11.5,
+                                              color: isDark ? const Color(0xFFFCA5A5) : overdueRed,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
+                                // Action Buttons
+                                if (_isManager) ...[
+                                  // Manager (Landlord / Agent) Actions
+                                  if (period.isOverdue) ...[
+                                    const SizedBox(height: 12),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _showInitiateLegalProcessDialog(period),
+                                      icon: const Icon(Icons.gavel_rounded, size: 18),
+                                      label: const Text('Hukuki Süreci Başlat'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: legalBurgundy,
+                                        foregroundColor: Colors.white,
+                                        minimumSize: const Size(double.infinity, 42),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                    ),
                                   ],
-                                ),
-                                if (!widget.effectiveIsLandlord) ...[
-                                  if (!isPaid) ...[
+                                  if (isPaid || hasReceipt) ...[
+                                    const SizedBox(height: 10),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _showReceiptDialog(period),
+                                      icon: const Icon(Icons.receipt_long, size: 18),
+                                      label: const Text('Dekontu Gör'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: vibrantBlue,
+                                        foregroundColor: Colors.white,
+                                        minimumSize: const Size(double.infinity, 42),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                    ),
+                                  ] else if (!period.isOverdue && !period.isInLegalProcess) ...[
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.info_outline,
+                                            size: 16, color: Colors.grey.shade500),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Henüz dekont yüklenmedi',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            color: isDark
+                                                ? Colors.grey.shade400
+                                                : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ] else ...[
+                                  // Tenant Actions
+                                  if (!isPaid && !period.isInLegalProcess) ...[
                                     const SizedBox(height: 14),
                                     ElevatedButton.icon(
                                       onPressed: isUploading
@@ -704,43 +1217,6 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                                         const SizedBox(width: 6),
                                         Text(
                                           'Dekont onaylandı / yüklendi',
-                                          style: TextStyle(
-                                            fontSize: 12.5,
-                                            color: isDark
-                                                ? Colors.grey.shade400
-                                                : Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ] else ...[
-                                  if (isPaid || hasReceipt) ...[
-                                    const SizedBox(height: 14),
-                                    ElevatedButton.icon(
-                                      onPressed: () => _showReceiptDialog(period),
-                                      icon: const Icon(Icons.receipt_long, size: 18),
-                                      label: const Text('Dekontu Gör'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: vibrantBlue,
-                                        foregroundColor: Colors.white,
-                                        minimumSize:
-                                            const Size(double.infinity, 42),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        elevation: 0,
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.info_outline,
-                                            size: 16, color: Colors.grey.shade500),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Henüz dekont yüklenmedi',
                                           style: TextStyle(
                                             fontSize: 12.5,
                                             color: isDark

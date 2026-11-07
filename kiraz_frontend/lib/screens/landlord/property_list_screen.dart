@@ -488,7 +488,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
                       ElevatedButton.icon(
                         onPressed: _navigateToAddProperty,
                         icon: const Icon(Icons.add, size: 18),
-                        label: const Text('+ Mülk Ekle'),
+                        label: const Text('Mülk Ekle'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryBlue,
                           foregroundColor: Colors.white,
