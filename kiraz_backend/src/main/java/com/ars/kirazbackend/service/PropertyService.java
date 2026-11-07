@@ -3,6 +3,7 @@ package com.ars.kirazbackend.service;
 import com.ars.kirazbackend.dto.PropertyRequest;
 import com.ars.kirazbackend.entity.LeaseAgreement;
 import com.ars.kirazbackend.entity.Property;
+import com.ars.kirazbackend.entity.PropertyDelegation;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.enums.LeaseStatus;
 import com.ars.kirazbackend.repository.LeaseAgreementRepository;
@@ -19,6 +20,7 @@ public class PropertyService {
     private final PropertyRepository propertyRepository;
     private final UserRepository userRepository;
     private final LeaseAgreementRepository leaseAgreementRepository;
+    private final PropertyDelegationService propertyDelegationService;
 
     public Property createProperty(PropertyRequest request) {
         User landlord = userRepository.findById(request.getLandlordId())
@@ -39,6 +41,19 @@ public class PropertyService {
             return java.util.Collections.emptyList();
         }
         List<Property> properties = propertyRepository.findByLandlordId(landlordId);
+        properties.forEach(this::populateTenantInfo);
+        return properties;
+    }
+
+    public List<Property> getPropertiesForAgent(Long agentId) {
+        if (agentId == null) {
+            return java.util.Collections.emptyList();
+        }
+        List<PropertyDelegation> activeDelegations = propertyDelegationService.getActiveDelegationsForAgent(agentId);
+        List<Property> properties = activeDelegations.stream()
+                .map(PropertyDelegation::getProperty)
+                .distinct()
+                .toList();
         properties.forEach(this::populateTenantInfo);
         return properties;
     }

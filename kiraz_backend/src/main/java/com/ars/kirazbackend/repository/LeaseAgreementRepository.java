@@ -22,5 +22,11 @@ public interface LeaseAgreementRepository extends JpaRepository<LeaseAgreement, 
     List<LeaseAgreement> findByPropertyId(@Param("propertyId") Long propertyId);
 
     Optional<LeaseAgreement> findByInviteCode(String inviteCode);
+
+    List<LeaseAgreement> findByPropertyLandlordIdAndApprovalStatus(Long landlordId, com.ars.kirazbackend.enums.LeaseApprovalStatus approvalStatus);
+
+    List<LeaseAgreement> findByCreatedById(Long createdById);
+
+    List<LeaseAgreement> findByApprovalStatus(com.ars.kirazbackend.enums.LeaseApprovalStatus approvalStatus);
 }
 

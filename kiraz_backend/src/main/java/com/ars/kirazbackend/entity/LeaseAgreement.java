@@ -1,5 +1,6 @@
 package com.ars.kirazbackend.entity;
 
+import com.ars.kirazbackend.enums.LeaseApprovalStatus;
 import com.ars.kirazbackend.enums.LeaseStatus;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -58,9 +59,37 @@ public class LeaseAgreement {
     @Enumerated(EnumType.STRING)
     private LeaseStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "approval_status")
+    private LeaseApprovalStatus approvalStatus;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_id")
+    private User createdBy;
+
+    private String rejectionReason;
+
     private String inviteCode;
 
     private String contractFileUrl;
+
+    @Transient
+    @JsonProperty("approvalStatusName")
+    public String getApprovalStatusName() {
+        return approvalStatus != null ? approvalStatus.name() : null;
+    }
+
+    @Transient
+    @JsonProperty("createdByName")
+    public String getCreatedByName() {
+        return createdBy != null ? createdBy.getFullName() : null;
+    }
+
+    @Transient
+    @JsonProperty("createdByRole")
+    public String getCreatedByRole() {
+        return (createdBy != null && createdBy.getRole() != null) ? createdBy.getRole().name() : null;
+    }
 
     @Transient
     @JsonProperty("landlordName")

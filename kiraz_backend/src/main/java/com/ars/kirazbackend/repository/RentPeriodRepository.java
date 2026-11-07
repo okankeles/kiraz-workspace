@@ -1,9 +1,13 @@
 package com.ars.kirazbackend.repository;
 
 import com.ars.kirazbackend.entity.RentPeriod;
+import com.ars.kirazbackend.enums.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -12,4 +16,12 @@ public interface RentPeriodRepository extends JpaRepository<RentPeriod, Long> {
     List<RentPeriod> findByLeaseAgreementId(Long leaseId);
 
     List<RentPeriod> findByLeaseAgreementIdOrderByPeriodStartAsc(Long leaseId);
+
+    List<RentPeriod> findByStatus(PaymentStatus status);
+
+    @Query("SELECT r FROM RentPeriod r WHERE r.status = :status AND ((r.paymentDate IS NOT NULL AND r.paymentDate < :today) OR (r.paymentDate IS NULL AND r.periodStart < :today))")
+    List<RentPeriod> findPendingOverduePeriods(
+            @Param("status") PaymentStatus status,
+            @Param("today") LocalDate today
+    );
 }

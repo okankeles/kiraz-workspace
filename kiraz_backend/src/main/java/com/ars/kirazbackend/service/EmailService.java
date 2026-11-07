@@ -33,4 +33,25 @@ public class EmailService {
             log.error("Failed to send invite email to {}", toEmail, e);
         }
     }
+
+    public void sendAgentInviteEmail(String toEmail, String agentName, String propertyTitle, String referenceCode) {
+        if (toEmail == null || toEmail.trim().isEmpty()) {
+            log.warn("Cannot send agent invite email: toEmail is empty");
+            return;
+        }
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(toEmail.trim());
+            message.setSubject("kiraZ - Emlakçı Yetkilendirme Daveti");
+            message.setText("Merhaba " + (agentName != null ? agentName : "Değerli Emlak Danışmanı") + ",\n\n" +
+                    (propertyTitle != null ? propertyTitle : "Taşınmaz") + " mülkü için ev sahibi sizi emlakçı olarak yetkilendirdi.\n\n" +
+                    "Sisteme kayıt olurken aşağıdaki Referans Kodunu (Davet Kodu) kullanarak hesabınızı oluşturabilir ve yetkilendirildiğiniz mülkleri yönetebilirsiniz:\n\n" +
+                    "Referans Kodu: " + referenceCode + "\n\n" +
+                    "kiraZ Ailesi");
+            mailSender.send(message);
+            log.info("Agent invite email sent successfully to {}", toEmail);
+        } catch (Exception e) {
+            log.error("Failed to send agent invite email to {}", toEmail, e);
+        }
+    }
 }

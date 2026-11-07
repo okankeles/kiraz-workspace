@@ -28,6 +28,7 @@ public class LeaseController {
     private final RentPeriodService rentPeriodService;
 
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LANDLORD', 'AGENT')")
     public ResponseEntity<LeaseAgreement> createLease(@RequestBody LeaseRequest request) {
         return ResponseEntity.ok(leaseService.createLease(request));
     }
@@ -89,7 +90,31 @@ public class LeaseController {
     @PostMapping(value = "/{id}/contract", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<LeaseAgreement> uploadContract(
             @PathVariable Long id,
-            @RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(leaseService.uploadContract(id, file));
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) Long userId) {
+        return ResponseEntity.ok(leaseService.uploadContract(id, file, userId));
+    }
+
+    @PutMapping("/{id}/approve")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('LANDLORD')")
+    public ResponseEntity<LeaseAgreement> approveLease(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long landlordId) {
+        return ResponseEntity.ok(leaseService.approveLease(id, landlordId));
+    }
+
+    @PutMapping("/{id}/reject")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('LANDLORD')")
+    public ResponseEntity<LeaseAgreement> rejectLease(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long landlordId,
+            @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(leaseService.rejectLease(id, landlordId, reason));
+    }
+
+    @GetMapping("/landlord/{landlordId}/pending-approvals")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('LANDLORD')")
+    public ResponseEntity<List<LeaseAgreement>> getPendingApprovals(@PathVariable Long landlordId) {
+        return ResponseEntity.ok(leaseService.getPendingApprovalLeasesForLandlord(landlordId));
     }
 }

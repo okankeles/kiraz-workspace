@@ -39,4 +39,13 @@ public class RentPeriodController {
             @RequestParam("status") String status) {
         return ResponseEntity.ok(rentPeriodService.updateStatus(id, status));
     }
+
+    @PutMapping("/{id}/legal-process")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LANDLORD', 'AGENT')")
+    public ResponseEntity<RentPeriod> initiateLegalProcess(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String notes) {
+        return ResponseEntity.ok(rentPeriodService.markAsLegalProcess(id, userId, notes));
+    }
 }

@@ -21,6 +21,8 @@ public class LeaseRequest {
 
     // Optional fields for flexibility
     private Long tenantId;
+    private Long createdById;
+    private Long agentId;
     private LocalDate endDate;
     private BigDecimal monthlyRentAmount;
     private BigDecimal depositAmount;
