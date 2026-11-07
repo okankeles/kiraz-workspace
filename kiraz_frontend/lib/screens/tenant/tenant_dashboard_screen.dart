@@ -12,10 +12,12 @@ import '../../models/rent_period.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/lease_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/payment_service.dart';
 import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/cherry_logo.dart';
 import '../auth/invite_code_screen.dart';
+import 'paytr_payment_screen.dart';
 
 class TenantDashboardScreen extends StatefulWidget {
   const TenantDashboardScreen({super.key});
@@ -32,6 +34,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   final RentPeriodService _rentPeriodService = RentPeriodService();
   final DashboardService _dashboardService = DashboardService();
   final NotificationService _notificationService = NotificationService();
+  final PaymentService _paymentService = PaymentService();
 
   String _userName = '';
   DashboardStats? _stats;
@@ -42,6 +45,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   int? _uploadingPeriodId;
+  int? _payingPeriodId;
   bool _isActivatingLease = false;
   int _selectedTabIndex = 0; // 0: All, 1: PAID, 2: OVERDUE, 3: PENDING
 
@@ -346,6 +350,88 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       } finally {
         if (mounted) setState(() => _uploadingPeriodId = null);
       }
+    }
+  }
+
+  Future<void> _payWithCard(RentPeriod period) async {
+    setState(() => _payingPeriodId = period.id);
+
+    try {
+      final token = await _paymentService.initializePayment(period.id);
+
+      if (!mounted) return;
+      setState(() => _payingPeriodId = null);
+
+      final success = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PayTrPaymentScreen(
+            token: token,
+            title: '${period.periodStartFormatted.isNotEmpty ? period.periodStartFormatted : "Kira"} Ödemesi',
+          ),
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (success == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Ödeme başarıyla tamamlandı! Kira durumunuz güncellendi.',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        _fetchTenantData();
+      } else if (success == false) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Ödeme işlemi tamamlanamadı veya iptal edildi.'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange.shade800,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _payingPeriodId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Ödeme başlatılamadı: ${e.toString().replaceAll('Exception: ', '')}'),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -1234,6 +1320,8 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     final hasReceipt = period.receiptImageUrl != null && period.receiptImageUrl!.trim().isNotEmpty;
     final isPendingApproval = !isPaid && hasReceipt;
     final isUploading = _uploadingPeriodId == period.id;
+    final isPaying = _payingPeriodId == period.id;
+    final canPayWithCard = !isPaid && !isLegal && (period.isPending || period.isOverdue);
 
     final monthTitle = _formatMonthYear(period.periodStart);
     final rentAmountStr = _activeLease != null
@@ -1261,310 +1349,356 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Left Date Badge Icon
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isLegal
-                  ? (isDark ? const Color(0xFF4C0519) : const Color(0xFFFFF1F2))
-                  : (isPaid
-                      ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
-                      : (isOverdue
-                          ? (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2))
-                          : (isPendingApproval
-                              ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7))
-                              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9))))),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isLegal
-                    ? const Color(0xFF881337)
-                    : (isPaid
-                        ? (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
-                        : (isOverdue
-                            ? (isDark ? const Color(0xFFDC2626) : const Color(0xFFFECACA))
-                            : (isPendingApproval
-                                ? (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A))
-                                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))))),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left Date Badge Icon
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isLegal
+                      ? (isDark ? const Color(0xFF4C0519) : const Color(0xFFFFF1F2))
+                      : (isPaid
+                          ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
+                          : (isOverdue
+                              ? (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2))
+                              : (isPendingApproval
+                                  ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7))
+                                  : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9))))),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isLegal
+                        ? const Color(0xFF881337)
+                        : (isPaid
+                            ? (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
+                            : (isOverdue
+                                ? (isDark ? const Color(0xFFDC2626) : const Color(0xFFFECACA))
+                                : (isPendingApproval
+                                    ? (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A))
+                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))))),
+                  ),
+                ),
+                child: Icon(
+                  isLegal
+                      ? Icons.gavel_rounded
+                      : (isPaid
+                          ? Icons.check_circle_rounded
+                          : (isOverdue
+                              ? Icons.warning_amber_rounded
+                              : (isPendingApproval
+                                  ? Icons.hourglass_bottom_rounded
+                                  : Icons.calendar_today_rounded))),
+                  color: isLegal
+                      ? const Color(0xFF881337)
+                      : (isPaid
+                          ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                          : (isOverdue
+                              ? (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626))
+                              : (isPendingApproval
+                                  ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706))
+                                  : (isDark ? accentBlue : const Color(0xFF1E50CE))))),
+                  size: 22,
+                ),
               ),
-            ),
-            child: Icon(
-              isLegal
-                  ? Icons.gavel_rounded
-                  : (isPaid
-                      ? Icons.check_circle_rounded
-                      : (isOverdue
-                          ? Icons.warning_amber_rounded
-                          : (isPendingApproval
-                              ? Icons.hourglass_bottom_rounded
-                              : Icons.calendar_today_rounded))),
-              color: isLegal
-                  ? const Color(0xFF881337)
-                  : (isPaid
-                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                      : (isOverdue
-                          ? (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626))
-                          : (isPendingApproval
-                              ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706))
-                              : (isDark ? accentBlue : const Color(0xFF1E50CE))))),
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
+              const SizedBox(width: 14),
 
-          // Period Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  monthTitle,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  rentAmountStr,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _getSubtitleText(period),
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: subtitleColor,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Action / Status Badge & Buttons
-          if (isPaid) ...[
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.check_rounded,
-                        size: 14,
-                        color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Ödendi',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (hasReceipt) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => _showReceiptViewer(period),
-                    icon: const Icon(Icons.receipt_long_rounded, size: 14),
-                    label: Text(
-                      'Dekontu Gör',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? accentBlue : const Color(0xFF1E50CE),
-                      side: BorderSide(
-                        color: isDark ? accentBlue : const Color(0xFF1E50CE),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ] else ...[
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Status badge
-                if (isLegal) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF4C0519) : const Color(0xFFFFF1F2),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: const Color(0xFF881337),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.gavel_rounded, size: 12, color: Color(0xFF881337)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Hukuki Süreçte / Avukatta',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFFFDA4AF) : const Color(0xFF881337),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else if (isOverdue) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFFDC2626) : const Color(0xFFFECACA),
-                      ),
-                    ),
-                    child: Text(
-                      'Gecikmede',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
+              // Period Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      monthTitle,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+                        color: textPrimary,
                       ),
                     ),
-                  ),
-                ] else if (isPendingApproval) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A),
-                      ),
-                    ),
-                    child: Text(
-                      'Onay Bekliyor',
+                    const SizedBox(height: 2),
+                    Text(
+                      rentAmountStr,
                       style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                      ),
-                    ),
-                    child: Text(
-                      'Bekliyor',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
                         color: textSecondary,
                       ),
                     ),
-                  ),
-                ],
-
-                // Dekontu Gör Button
-                if (hasReceipt) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => _showReceiptViewer(period),
-                    icon: const Icon(Icons.receipt_long_rounded, size: 14),
-                    label: Text(
-                      'Dekontu Gör',
+                    const SizedBox(height: 4),
+                    Text(
+                      _getSubtitleText(period),
                       style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: subtitleColor,
+                        height: 1.3,
                       ),
                     ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? accentBlue : const Color(0xFF1E50CE),
-                      side: BorderSide(
-                        color: isDark ? accentBlue : const Color(0xFF1E50CE),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
 
-                // Dekont Yükle Button (appears for unpaid/pending periods without a receipt)
-                if (!hasReceipt) ...[
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: isUploading ? null : () => _onUploadReceipt(period),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: vibrantBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(
+              // Action / Status Badge & Buttons
+              if (isPaid) ...[
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5),
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_rounded,
+                            size: 14,
+                            color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Ödendi',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: isUploading
+                    if (hasReceipt) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => _showReceiptViewer(period),
+                        icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                        label: Text(
+                          'Dekontu Gör',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isDark ? accentBlue : const Color(0xFF1E50CE),
+                          side: BorderSide(
+                            color: isDark ? accentBlue : const Color(0xFF1E50CE),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ] else ...[
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Status badge
+                    if (isLegal) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF4C0519) : const Color(0xFFFFF1F2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFF881337),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.gavel_rounded, size: 12, color: Color(0xFF881337)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Hukuki Süreçte / Avukatta',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFFFDA4AF) : const Color(0xFF881337),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (isOverdue) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFFDC2626) : const Color(0xFFFECACA),
+                          ),
+                        ),
+                        child: Text(
+                          'Gecikmede',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+                          ),
+                        ),
+                      ),
+                    ] else if (isPendingApproval) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A),
+                          ),
+                        ),
+                        child: Text(
+                          'Onay Bekliyor',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                        child: Text(
+                          'Bekliyor',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ],
+          ),
+
+          // Belirgin "Kredi Kartı ile Öde" (PayTR) ve "Dekont Yükle / Gör" Action Bar
+          if (canPayWithCard) ...[
+            const SizedBox(height: 14),
+            Container(
+              height: 1,
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    onPressed: (isPaying || isUploading) ? null : () => _payWithCard(period),
+                    icon: isPaying
                         ? const SizedBox(
-                            width: 14,
-                            height: 14,
+                            width: 16,
+                            height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               color: Colors.white,
                             ),
                           )
-                        : Text(
-                            'Dekont Yükle',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                        : const Icon(Icons.credit_card_rounded, size: 18),
+                    label: Text(
+                      isPaying ? 'Bağlanıyor...' : 'Kredi Kartı ile Öde',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: vibrantBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
-                ],
+                ),
+                const SizedBox(width: 8),
+                if (!hasReceipt)
+                  Expanded(
+                    flex: 2,
+                    child: OutlinedButton.icon(
+                      onPressed: (isUploading || isPaying) ? null : () => _onUploadReceipt(period),
+                      icon: isUploading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.upload_file_rounded, size: 16),
+                      label: Text(
+                        'Dekont Yükle',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isDark ? accentBlue : const Color(0xFF1E50CE),
+                        side: BorderSide(
+                          color: isDark ? accentBlue : const Color(0xFF1E50CE),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    flex: 2,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showReceiptViewer(period),
+                      icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                      label: Text(
+                        'Dekontu Gör',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isDark ? accentBlue : const Color(0xFF1E50CE),
+                        side: BorderSide(
+                          color: isDark ? accentBlue : const Color(0xFF1E50CE),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ],

@@ -6,8 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/lease.dart';
 import '../../models/rent_period.dart';
+import '../../services/payment_service.dart';
 import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
+import 'paytr_payment_screen.dart';
 
 class RentPeriodListScreen extends StatefulWidget {
   final int? leaseId;
@@ -40,10 +42,12 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
   static const Color overdueRedBg = Color(0xFFFEF2F2);
 
   final RentPeriodService _rentPeriodService = RentPeriodService();
+  final PaymentService _paymentService = PaymentService();
   List<RentPeriod> _periods = [];
   bool _isLoading = true;
   String? _errorMessage;
   int? _uploadingPeriodId;
+  int? _payingPeriodId;
   String _userRole = 'LANDLORD';
   int? _currentUserId;
 
@@ -131,6 +135,88 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
           setState(() => _uploadingPeriodId = null);
         }
       }
+    }
+  }
+
+  Future<void> _payWithCard(RentPeriod period) async {
+    setState(() => _payingPeriodId = period.id);
+
+    try {
+      final token = await _paymentService.initializePayment(period.id);
+
+      if (!mounted) return;
+      setState(() => _payingPeriodId = null);
+
+      final success = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PayTrPaymentScreen(
+            token: token,
+            title: '${period.periodStartFormatted.isNotEmpty ? period.periodStartFormatted : "Kira"} Ödemesi',
+          ),
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (success == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Ödeme başarıyla tamamlandı! Kira durumunuz güncellendi.',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        _fetchPeriods();
+      } else if (success == false) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Ödeme işlemi tamamlanamadı veya iptal edildi.'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange.shade800,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _payingPeriodId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Ödeme başlatılamadı: ${e.toString().replaceAll('Exception: ', '')}'),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -935,6 +1021,7 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                         final hasReceipt = period.receiptImageUrl != null &&
                             period.receiptImageUrl!.isNotEmpty;
                         final isUploading = _uploadingPeriodId == period.id;
+                        final isPaying = _payingPeriodId == period.id;
 
                         final dateDisplay = period.periodEnd.isNotEmpty
                             ? "${period.periodStartFormatted}  —  ${period.periodEnd}"
@@ -1180,8 +1267,39 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                                   // Tenant Actions
                                   if (!isPaid && !period.isInLegalProcess) ...[
                                     const SizedBox(height: 14),
-                                    ElevatedButton.icon(
-                                      onPressed: isUploading
+                                    if (period.isPending || period.isOverdue) ...[
+                                      ElevatedButton.icon(
+                                        onPressed: (isPaying || isUploading)
+                                            ? null
+                                            : () => _payWithCard(period),
+                                        icon: isPaying
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : const Icon(Icons.credit_card_rounded, size: 18),
+                                        label: Text(
+                                          isPaying ? 'Bağlanıyor...' : 'Kredi Kartı ile Öde',
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: vibrantBlue,
+                                          foregroundColor: Colors.white,
+                                          minimumSize: const Size(double.infinity, 44),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          elevation: 0,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                    ],
+                                    OutlinedButton.icon(
+                                      onPressed: (isUploading || isPaying)
                                           ? null
                                           : () => _onUploadReceipt(period),
                                       icon: isUploading
@@ -1190,22 +1308,21 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                                               height: 16,
                                               child: CircularProgressIndicator(
                                                 strokeWidth: 2,
-                                                color: Colors.white,
                                               ),
                                             )
                                           : const Icon(Icons.upload_file, size: 18),
                                       label: Text(isUploading
                                           ? 'Yükleniyor...'
-                                          : 'Dekont Yükle'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: vibrantBlue,
-                                        foregroundColor: Colors.white,
-                                        minimumSize:
-                                            const Size(double.infinity, 42),
+                                          : (hasReceipt ? 'Dekontu Güncelle' : 'Dekont Yükle')),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: isDark ? const Color(0xFF38BDF8) : vibrantBlue,
+                                        side: BorderSide(
+                                          color: isDark ? const Color(0xFF38BDF8) : vibrantBlue,
+                                        ),
+                                        minimumSize: const Size(double.infinity, 42),
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(10),
                                         ),
-                                        elevation: 0,
                                       ),
                                     ),
                                   ] else if (hasReceipt) ...[

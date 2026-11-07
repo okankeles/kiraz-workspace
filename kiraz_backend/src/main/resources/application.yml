@@ -26,3 +26,11 @@ spring:
           starttls:
             enable: true
 
+paytr:
+  merchant-id: "659790"
+  merchant-key: "XQTmSzbmBw5YAYzW"
+  merchant-salt: "K5uAP8fQ5htrfKd4"
+  test-mode: "1"
+  ok-url: "https://kiraz.app/payment-success"
+  fail-url: "https://kiraz.app/payment-fail"
+  timeout-limit: "30"
