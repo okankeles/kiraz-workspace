@@ -233,46 +233,8 @@ public class PayTrService {
                             merchantOid, totalAmount)
             );
 
-            // Kiracı Bildirimi
-            if (tenant != null) {
-                notificationService.createNotification(
-                        tenant.getId(),
-                        "Kira Ödemeniz Alındı",
-                        String.format("'%s' mülküne ait %02d/%d dönemi kira ödemeniz PayTR ile başarıyla tahsil edildi.",
-                                propertyTitle, savedPeriod.getMonth(), savedPeriod.getYear()),
-                        "PAYMENT_SUCCESS",
-                        savedPeriod.getLeaseAgreement().getId()
-                );
-            }
-
-            // Ev Sahibi Bildirimi
-            if (landlord != null) {
-                notificationService.createNotification(
-                        landlord.getId(),
-                        "Kira Tahsilatı Yapıldı",
-                        String.format("'%s' mülkünüz için %02d/%d dönemi kirası online olarak ödendi.",
-                                propertyTitle, savedPeriod.getMonth(), savedPeriod.getYear()),
-                        "PAYMENT_SUCCESS",
-                        savedPeriod.getLeaseAgreement().getId()
-                );
-            }
-
-            // Mülke atanmış aktif Emlakçı (Agent) varsa ona da bildirim ilet
-            if (property != null) {
-                List<PropertyDelegation> activeDelegations = propertyDelegationService.getDelegationsForProperty(property.getId());
-                for (PropertyDelegation del : activeDelegations) {
-                    if (del.getStatus() == com.ars.kirazbackend.enums.DelegationStatus.ACTIVE && del.getAgent() != null) {
-                        notificationService.createNotification(
-                                del.getAgent().getId(),
-                                "Kira Tahsilatı Yapıldı",
-                                String.format("Yetkili olduğunuz '%s' mülkü için %02d/%d dönemi kirası ödendi.",
-                                        propertyTitle, savedPeriod.getMonth(), savedPeriod.getYear()),
-                                "PAYMENT_SUCCESS",
-                                savedPeriod.getLeaseAgreement().getId()
-                        );
-                    }
-                }
-            }
+            // Kiracı, Ev Sahibi ve Emlakçıya ödeme başarı bildirimi gönder
+            notificationService.notifyPaymentSuccess(savedPeriod);
 
         } else {
             String failedMsg = payload.getFirst("failed_reason_msg");

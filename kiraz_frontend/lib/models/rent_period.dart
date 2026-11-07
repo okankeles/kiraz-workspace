@@ -46,6 +46,14 @@ class RentPeriod {
     return s == 'REJECTED' || s == 'REDDEDİLDİ' || s == 'REDDEDILDI';
   }
 
+  bool get isWaitingApproval {
+    final s = status.toUpperCase();
+    return s == 'WAITING_APPROVAL' ||
+        s == 'ONAY BEKLİYOR' ||
+        s == 'ONAY_BEKLIYOR' ||
+        (isPending && (receiptImageUrl != null && receiptImageUrl!.trim().isNotEmpty));
+  }
+
   bool get isPending {
     final s = status.toUpperCase();
     return s == 'PENDING' || s == 'BEKLİYOR' || s == 'BEKLIYOR';

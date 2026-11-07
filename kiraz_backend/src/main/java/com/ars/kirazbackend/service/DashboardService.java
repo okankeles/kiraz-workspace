@@ -68,6 +68,8 @@ public class DashboardService {
                     } else {
                         upcoming = upcoming.add(rentAmount);
                     }
+                } else if (status == PaymentStatus.WAITING_APPROVAL) {
+                    pendingApproval = pendingApproval.add(rentAmount);
                 } else if (status == PaymentStatus.REJECTED) {
                     overdue = overdue.add(rentAmount);
                 }

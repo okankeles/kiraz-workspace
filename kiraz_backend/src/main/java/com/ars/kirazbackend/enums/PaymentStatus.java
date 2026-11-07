@@ -5,5 +5,6 @@ public enum PaymentStatus {
     PAID,
     OVERDUE,
     IN_LEGAL_PROCESS,
-    REJECTED
+    REJECTED,
+    WAITING_APPROVAL
 }

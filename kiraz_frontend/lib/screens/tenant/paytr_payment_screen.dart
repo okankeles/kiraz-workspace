@@ -110,8 +110,8 @@ class _PayTrPaymentScreenState extends State<PayTrPaymentScreen> {
     }
   }
 
-  Future<bool> _onWillPop() async {
-    if (_isFinished) return true;
+  Future<void> _handleExitRequest() async {
+    if (_isFinished) return;
 
     final shouldLeave = await showDialog<bool>(
       context: context,
@@ -153,11 +153,9 @@ class _PayTrPaymentScreenState extends State<PayTrPaymentScreen> {
       ),
     );
 
-    if (shouldLeave == true) {
+    if (shouldLeave == true && mounted) {
       _finishPayment(false);
-      return true;
     }
-    return false;
   }
 
   @override
@@ -168,10 +166,7 @@ class _PayTrPaymentScreenState extends State<PayTrPaymentScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        final shouldLeave = await _onWillPop();
-        if (shouldLeave && context.mounted) {
-          Navigator.of(context).pop(false);
-        }
+        await _handleExitRequest();
       },
       child: Scaffold(
         backgroundColor: isDark ? darkNavy : ivoryBg,
@@ -182,12 +177,7 @@ class _PayTrPaymentScreenState extends State<PayTrPaymentScreen> {
           leading: IconButton(
             icon: const Icon(Icons.close_rounded),
             tooltip: 'Kapat',
-            onPressed: () async {
-              final shouldLeave = await _onWillPop();
-              if (shouldLeave && context.mounted) {
-                Navigator.of(context).pop(false);
-              }
-            },
+            onPressed: _handleExitRequest,
           ),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

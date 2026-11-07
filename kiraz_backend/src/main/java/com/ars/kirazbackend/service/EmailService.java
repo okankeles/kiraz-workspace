@@ -54,4 +54,20 @@ public class EmailService {
             log.error("Failed to send agent invite email to {}", toEmail, e);
         }
     }
+
+    public void sendNotificationEmail(String toEmail, String subject, String body) {
+        if (toEmail == null || toEmail.trim().isEmpty()) {
+            return;
+        }
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(toEmail.trim());
+            message.setSubject(subject);
+            message.setText(body);
+            mailSender.send(message);
+            log.info("Notification email sent successfully to {}", toEmail);
+        } catch (Exception e) {
+            log.warn("Failed to send notification email to {}: {}", toEmail, e.getMessage());
+        }
+    }
 }

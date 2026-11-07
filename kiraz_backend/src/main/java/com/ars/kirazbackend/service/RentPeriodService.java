@@ -1,5 +1,6 @@
 package com.ars.kirazbackend.service;
 
+import com.ars.kirazbackend.dto.PaymentSummaryResponse;
 import com.ars.kirazbackend.entity.Property;
 import com.ars.kirazbackend.entity.RentPeriod;
 import com.ars.kirazbackend.entity.User;
@@ -13,8 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Slf4j
@@ -204,35 +207,25 @@ public class RentPeriodService {
     @Transactional
     public RentPeriod uploadReceipt(Long periodId, MultipartFile file) {
         RentPeriod period = rentPeriodRepository.findById(periodId)
-                .orElseThrow(() -> new RuntimeException("Rent period not found"));
+                .orElseThrow(() -> new RuntimeException("Kira dönemi bulunamadı: " + periodId));
 
         String fileUrl = fileStorageService.storeFile(file);
         period.setReceiptImageUrl(fileUrl);
-        period.setStatus(PaymentStatus.PENDING);
+        period.setStatus(PaymentStatus.WAITING_APPROVAL);
 
         RentPeriod savedPeriod = rentPeriodRepository.save(period);
 
-        if (savedPeriod.getLeaseAgreement() != null &&
-            savedPeriod.getLeaseAgreement().getProperty() != null &&
-            savedPeriod.getLeaseAgreement().getProperty().getLandlord() != null) {
+        User tenant = (savedPeriod.getLeaseAgreement() != null) ? savedPeriod.getLeaseAgreement().getTenant() : null;
+        auditLogService.record(
+                "RENT_PERIOD",
+                savedPeriod.getId(),
+                "RECEIPT_UPLOADED",
+                tenant,
+                String.format("%02d/%d dönemi için Havale/EFT dekontu yüklendi. Onay bekleniyor.",
+                        savedPeriod.getMonth(), savedPeriod.getYear())
+        );
 
-            Long landlordId = savedPeriod.getLeaseAgreement().getProperty().getLandlord().getId();
-            String tenantName = (savedPeriod.getLeaseAgreement().getTenant() != null &&
-                    savedPeriod.getLeaseAgreement().getTenant().getFullName() != null)
-                    ? savedPeriod.getLeaseAgreement().getTenant().getFullName()
-                    : "Kiracınız";
-            String propertyName = (savedPeriod.getLeaseAgreement().getProperty().getTitle() != null)
-                    ? savedPeriod.getLeaseAgreement().getProperty().getTitle()
-                    : "Taşınmaz";
-
-            notificationService.createNotification(
-                    landlordId,
-                    "Yeni Dekont Yüklendi",
-                    tenantName + " adlı kiracınız " + propertyName + " için dekont yükledi.",
-                    "RECEIPT",
-                    savedPeriod.getLeaseAgreement().getId()
-            );
-        }
+        notificationService.notifyLandlordForReceipt(savedPeriod);
 
         return savedPeriod;
     }
@@ -240,7 +233,7 @@ public class RentPeriodService {
     @Transactional
     public RentPeriod updateStatus(Long id, String status) {
         RentPeriod period = rentPeriodRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Rent period not found"));
+                .orElseThrow(() -> new RuntimeException("Kira dönemi bulunamadı: " + id));
 
         String normalized = status != null ? status.trim().toUpperCase() : "";
         PaymentStatus paymentStatus;
@@ -248,6 +241,8 @@ public class RentPeriodService {
             paymentStatus = PaymentStatus.PAID;
         } else if ("REJECTED".equals(normalized) || "REDDEDİLDİ".equals(normalized) || "REDDEDILDI".equals(normalized) || "UNPAID".equals(normalized) || "REJECT".equals(normalized)) {
             paymentStatus = PaymentStatus.REJECTED;
+        } else if ("WAITING_APPROVAL".equals(normalized) || "ONAY_BEKLIYOR".equals(normalized) || "ONAY BEKLİYOR".equals(normalized)) {
+            paymentStatus = PaymentStatus.WAITING_APPROVAL;
         } else if ("PENDING".equals(normalized) || "BEKLİYOR".equals(normalized) || "BEKLIYOR".equals(normalized)) {
             paymentStatus = PaymentStatus.PENDING;
         } else if ("OVERDUE".equals(normalized) || "GECİKTİ".equals(normalized) || "GECIKTI".equals(normalized)) {
@@ -258,42 +253,44 @@ public class RentPeriodService {
             try {
                 paymentStatus = PaymentStatus.valueOf(normalized);
             } catch (IllegalArgumentException e) {
-                throw new RuntimeException("Invalid payment status: " + status);
+                throw new RuntimeException("Geçersiz ödeme statüsü: " + status);
             }
         }
         period.setStatus(paymentStatus);
         if (paymentStatus == PaymentStatus.REJECTED) {
             period.setReceiptImageUrl(null); // Clear the invalid receipt so tenant can re-upload
+        } else if (paymentStatus == PaymentStatus.PAID) {
+            period.setPaymentDate(LocalDate.now());
         }
+
         RentPeriod savedPeriod = rentPeriodRepository.save(period);
 
         if (paymentStatus == PaymentStatus.PAID) {
-            if (savedPeriod.getLeaseAgreement() != null &&
-                savedPeriod.getLeaseAgreement().getTenant() != null) {
+            notificationService.notifyPaymentSuccess(savedPeriod);
 
-                Long tenantId = savedPeriod.getLeaseAgreement().getTenant().getId();
-                String propertyName = (savedPeriod.getLeaseAgreement().getProperty() != null &&
-                        savedPeriod.getLeaseAgreement().getProperty().getTitle() != null)
-                        ? savedPeriod.getLeaseAgreement().getProperty().getTitle()
-                        : "Taşınmaz";
-
+            User landlord = (savedPeriod.getLeaseAgreement() != null && savedPeriod.getLeaseAgreement().getProperty() != null)
+                    ? savedPeriod.getLeaseAgreement().getProperty().getLandlord()
+                    : null;
+            auditLogService.record(
+                    "RENT_PERIOD",
+                    savedPeriod.getId(),
+                    "PAYMENT_APPROVED",
+                    landlord,
+                    String.format("%02d/%d dönemi kira ödemesi ev sahibi tarafından onaylandı.",
+                            savedPeriod.getMonth(), savedPeriod.getYear())
+            );
+        } else if (paymentStatus == PaymentStatus.REJECTED) {
+            period.setReceiptImageUrl(null); // Clear the invalid receipt so tenant can re-upload
+            if (savedPeriod.getLeaseAgreement() != null && savedPeriod.getLeaseAgreement().getTenant() != null) {
                 notificationService.createNotification(
-                        tenantId,
-                        "Ödeme Onaylandı",
-                        propertyName + " için ödemeniz onaylandı.",
-                        "APPROVAL",
+                        savedPeriod.getLeaseAgreement().getTenant().getId(),
+                        "Ödeme Reddedildi",
+                        (savedPeriod.getLeaseAgreement().getProperty() != null ? savedPeriod.getLeaseAgreement().getProperty().getTitle() : "Mülk")
+                                + " için yüklediğiniz dekont reddedildi. Lütfen yeni bir dekont yükleyin.",
+                        "REJECT",
                         savedPeriod.getLeaseAgreement().getId()
                 );
             }
-        } else if (paymentStatus == PaymentStatus.REJECTED) {
-            period.setReceiptImageUrl(null); // Clear the invalid receipt so tenant can re-upload
-            notificationService.createNotification(
-                period.getLeaseAgreement().getTenantId(),
-                "Ödeme Reddedildi",
-                period.getLeaseAgreement().getProperty().getTitle() + " için yüklediğiniz dekont reddedildi. Lütfen yeni bir dekont yükleyin.",
-                "REJECT",
-                period.getLeaseAgreement().getId()
-            );
         }
 
         return savedPeriod;
@@ -302,5 +299,76 @@ public class RentPeriodService {
     @Transactional
     public RentPeriod updateStatus(Long id, PaymentStatus status) {
         return updateStatus(id, status != null ? status.name() : null);
+    }
+
+    /**
+     * Kiracının anlık finansal özetini (Toplam Borç, Toplam Ödenen, Sıradaki Ödeme) hesaplar.
+     */
+    @Transactional
+    public PaymentSummaryResponse getTenantPaymentSummary(Long tenantId) {
+        if (tenantId == null) {
+            throw new IllegalArgumentException("Kiracı ID boş olamaz.");
+        }
+
+        List<RentPeriod> periods = rentPeriodRepository.findByTenantId(tenantId);
+        // Otomatik vadesi geçen kontrollerini uygula
+        periods = checkAndApplyOverdue(periods);
+
+        LocalDate today = LocalDate.now();
+        BigDecimal totalPaid = BigDecimal.ZERO;
+        BigDecimal totalDebt = BigDecimal.ZERO;
+
+        List<RentPeriod> pendingPeriods = new ArrayList<>();
+
+        for (RentPeriod period : periods) {
+            BigDecimal rentAmount = (period.getLeaseAgreement() != null && period.getLeaseAgreement().getMonthlyRentAmount() != null)
+                    ? period.getLeaseAgreement().getMonthlyRentAmount()
+                    : BigDecimal.ZERO;
+
+            PaymentStatus status = period.getStatus();
+            LocalDate dueDate = period.getPaymentDate() != null ? period.getPaymentDate() : period.getPeriodStart();
+
+            if (status == PaymentStatus.PAID) {
+                totalPaid = totalPaid.add(rentAmount);
+            } else if (status == PaymentStatus.OVERDUE || status == PaymentStatus.IN_LEGAL_PROCESS) {
+                totalDebt = totalDebt.add(rentAmount);
+            } else if (status == PaymentStatus.PENDING) {
+                pendingPeriods.add(period);
+                if (dueDate != null && !dueDate.isAfter(today)) {
+                    totalDebt = totalDebt.add(rentAmount);
+                }
+            }
+        }
+
+        // Statüsü PENDING olanlar arasında tarihi en yakın olanı bulup nextPaymentDate ve nextPaymentAmount set et
+        LocalDate nextPaymentDate = null;
+        BigDecimal nextPaymentAmount = BigDecimal.ZERO;
+
+        if (!pendingPeriods.isEmpty()) {
+            RentPeriod nextPeriod = pendingPeriods.stream()
+                    .filter(p -> {
+                        LocalDate d = p.getPaymentDate() != null ? p.getPaymentDate() : p.getPeriodStart();
+                        return d != null && !d.isBefore(today);
+                    })
+                    .min(Comparator.comparing(p -> p.getPaymentDate() != null ? p.getPaymentDate() : p.getPeriodStart()))
+                    .orElseGet(() -> pendingPeriods.stream()
+                            .min(Comparator.comparing(p -> p.getPaymentDate() != null ? p.getPaymentDate() : p.getPeriodStart()))
+                            .orElse(null)
+                    );
+
+            if (nextPeriod != null) {
+                nextPaymentDate = nextPeriod.getPaymentDate() != null ? nextPeriod.getPaymentDate() : nextPeriod.getPeriodStart();
+                if (nextPeriod.getLeaseAgreement() != null && nextPeriod.getLeaseAgreement().getMonthlyRentAmount() != null) {
+                    nextPaymentAmount = nextPeriod.getLeaseAgreement().getMonthlyRentAmount();
+                }
+            }
+        }
+
+        return PaymentSummaryResponse.builder()
+                .totalDebt(totalDebt)
+                .totalPaid(totalPaid)
+                .nextPaymentDate(nextPaymentDate)
+                .nextPaymentAmount(nextPaymentAmount)
+                .build();
     }
 }

@@ -2,9 +2,13 @@ package com.ars.kirazbackend.controller;
 
 import com.ars.kirazbackend.dto.PayTrInitRequest;
 import com.ars.kirazbackend.dto.PayTrInitResponse;
+import com.ars.kirazbackend.entity.RentPeriod;
 import com.ars.kirazbackend.entity.User;
+import com.ars.kirazbackend.enums.PaymentStatus;
 import com.ars.kirazbackend.enums.RoleType;
+import com.ars.kirazbackend.dto.PaymentSummaryResponse;
 import com.ars.kirazbackend.service.PayTrService;
+import com.ars.kirazbackend.service.RentPeriodService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,12 +25,17 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -36,6 +46,9 @@ class PaymentControllerTest {
 
     @Mock
     private PayTrService payTrService;
+
+    @Mock
+    private RentPeriodService rentPeriodService;
 
     @InjectMocks
     private PaymentController paymentController;
@@ -102,5 +115,52 @@ class PaymentControllerTest {
                 .andExpect(content().string("OK"));
 
         verify(payTrService).processCallback(any());
+    }
+
+    @Test
+    void testGetPaymentSummary_ReturnsSummary() throws Exception {
+        LocalDate nextDate = LocalDate.now().plusDays(10);
+        PaymentSummaryResponse summaryResponse = PaymentSummaryResponse.builder()
+                .totalDebt(BigDecimal.valueOf(1000))
+                .totalPaid(BigDecimal.valueOf(5000))
+                .nextPaymentDate(nextDate)
+                .nextPaymentAmount(BigDecimal.valueOf(1000))
+                .build();
+
+        when(rentPeriodService.getTenantPaymentSummary(10L)).thenReturn(summaryResponse);
+
+        mockMvc.perform(get("/api/payments/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalDebt").value(1000))
+                .andExpect(jsonPath("$.totalPaid").value(5000))
+                .andExpect(jsonPath("$.nextPaymentDate").value(nextDate.toString()))
+                .andExpect(jsonPath("$.nextPaymentAmount").value(1000));
+
+        verify(rentPeriodService).getTenantPaymentSummary(10L);
+    }
+
+    @Test
+    void testUploadReceipt_ReturnsUpdatedPeriod() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "dekont.pdf", "application/pdf", "dummy receipt pdf content".getBytes()
+        );
+
+        RentPeriod mockPeriod = RentPeriod.builder()
+                .id(50L)
+                .month(11)
+                .year(2026)
+                .receiptImageUrl("/uploads/receipts/dekont.pdf")
+                .status(PaymentStatus.WAITING_APPROVAL)
+                .build();
+
+        when(rentPeriodService.uploadReceipt(eq(50L), any(MultipartFile.class))).thenReturn(mockPeriod);
+
+        mockMvc.perform(multipart("/api/payments/50/receipt").file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(50))
+                .andExpect(jsonPath("$.status").value("WAITING_APPROVAL"))
+                .andExpect(jsonPath("$.receiptImageUrl").value("/uploads/receipts/dekont.pdf"));
+
+        verify(rentPeriodService).uploadReceipt(eq(50L), any(MultipartFile.class));
     }
 }

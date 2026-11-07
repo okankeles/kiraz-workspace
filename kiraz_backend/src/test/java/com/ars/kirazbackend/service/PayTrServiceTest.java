@@ -189,14 +189,6 @@ class PayTrServiceTest {
         when(rentPeriodRepository.findById(50L)).thenReturn(Optional.of(rentPeriod));
         when(rentPeriodRepository.save(any(RentPeriod.class))).thenAnswer(i -> i.getArgument(0));
 
-        // Mock delegation for agent
-        PropertyDelegation delegation = PropertyDelegation.builder()
-                .property(property)
-                .agent(agent)
-                .status(DelegationStatus.ACTIVE)
-                .build();
-        when(propertyDelegationService.getDelegationsForProperty(10L)).thenReturn(List.of(delegation));
-
         String result = payTrService.processCallback(payload);
 
         assertEquals("OK", result);
@@ -206,10 +198,8 @@ class PayTrServiceTest {
         verify(rentPeriodRepository).save(rentPeriod);
         verify(auditLogService).record(eq("RENT_PERIOD"), eq(50L), eq("PAYTR_PAYMENT_SUCCESS"), eq(tenant), anyString());
 
-        // Verify notifications sent to tenant, landlord, and active agent
-        verify(notificationService).createNotification(eq(2L), contains("Kira"), anyString(), eq("PAYMENT_SUCCESS"), eq(100L));
-        verify(notificationService).createNotification(eq(1L), contains("Kira"), anyString(), eq("PAYMENT_SUCCESS"), eq(100L));
-        verify(notificationService).createNotification(eq(3L), contains("Kira"), anyString(), eq("PAYMENT_SUCCESS"), eq(100L));
+        // Verify notification sent via NotificationService
+        verify(notificationService).notifyPaymentSuccess(any(RentPeriod.class));
     }
 
     @Test

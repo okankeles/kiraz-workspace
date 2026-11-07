@@ -24,4 +24,7 @@ public interface RentPeriodRepository extends JpaRepository<RentPeriod, Long> {
             @Param("status") PaymentStatus status,
             @Param("today") LocalDate today
     );
+
+    @Query("SELECT r FROM RentPeriod r WHERE r.leaseAgreement.tenant.id = :tenantId ORDER BY r.periodStart ASC")
+    List<RentPeriod> findByTenantId(@Param("tenantId") Long tenantId);
 }

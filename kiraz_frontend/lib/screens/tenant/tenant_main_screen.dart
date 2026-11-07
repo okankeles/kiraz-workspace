@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../menu/menu_screen.dart';
+import 'payments_screen.dart';
 import 'tenant_contract_screen.dart';
 import 'tenant_dashboard_screen.dart';
 
@@ -133,14 +134,8 @@ class _TenantMainScreenState extends State<TenantMainScreen> {
           // Tab 1: Sözleşmem (Tenant Contract Screen)
           const TenantContractScreen(),
 
-          // Tab 2: Ödemeler (Placeholder)
-          _buildPlaceholderTab(
-            icon: Icons.payment_outlined,
-            title: 'Ödemelerim',
-            subtitle:
-                'Geçmiş ve gelecek tüm kira ve aidat ödeme geçmişinize bu ekrandan ulaşabilirsiniz.',
-            isDark: isDark,
-          ),
+          // Tab 2: Ödemelerim (Finansal Geçmiş & Ödeme)
+          const PaymentsScreen(),
 
           // Tab 3: Bakım (Placeholder)
           _buildPlaceholderTab(
