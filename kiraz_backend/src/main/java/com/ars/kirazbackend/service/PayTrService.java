@@ -7,6 +7,7 @@ import com.ars.kirazbackend.entity.PropertyDelegation;
 import com.ars.kirazbackend.entity.RentPeriod;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.enums.PaymentStatus;
+import com.ars.kirazbackend.event.PaymentSuccessEvent;
 import com.ars.kirazbackend.repository.RentPeriodRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,7 +39,7 @@ public class PayTrService {
 
     private final PayTrConfig payTrConfig;
     private final RentPeriodRepository rentPeriodRepository;
-    private final NotificationService notificationService;
+    private final KafkaProducerService kafkaProducerService;
     private final AuditLogService auditLogService;
     private final PropertyDelegationService propertyDelegationService;
     private final RestTemplate restTemplate;
@@ -233,8 +234,21 @@ public class PayTrService {
                             merchantOid, totalAmount)
             );
 
-            // Kiracı, Ev Sahibi ve Emlakçıya ödeme başarı bildirimi gönder
-            notificationService.notifyPaymentSuccess(savedPeriod);
+            // Kafka üzerinden asenkron olarak ödeme başarı olayını fırlat
+            Long tenantId = (tenant != null) ? tenant.getId() : null;
+            Long leaseId = (savedPeriod.getLeaseAgreement() != null) ? savedPeriod.getLeaseAgreement().getId() : null;
+            Double amount = null;
+            try {
+                amount = Double.parseDouble(totalAmount) / 100.0;
+            } catch (Exception ignored) {
+            }
+            kafkaProducerService.sendPaymentSuccessEvent(new PaymentSuccessEvent(
+                    savedPeriod.getId(),
+                    tenantId,
+                    leaseId,
+                    amount,
+                    "PAYTR"
+            ));
 
         } else {
             String failedMsg = payload.getFirst("failed_reason_msg");

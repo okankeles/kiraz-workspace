@@ -10,6 +10,7 @@ import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.enums.DelegationStatus;
 import com.ars.kirazbackend.enums.PaymentStatus;
 import com.ars.kirazbackend.enums.RoleType;
+import com.ars.kirazbackend.event.PaymentSuccessEvent;
 import com.ars.kirazbackend.repository.RentPeriodRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,7 @@ class PayTrServiceTest {
     private RentPeriodRepository rentPeriodRepository;
 
     @Mock
-    private NotificationService notificationService;
+    private KafkaProducerService kafkaProducerService;
 
     @Mock
     private AuditLogService auditLogService;
@@ -198,8 +199,8 @@ class PayTrServiceTest {
         verify(rentPeriodRepository).save(rentPeriod);
         verify(auditLogService).record(eq("RENT_PERIOD"), eq(50L), eq("PAYTR_PAYMENT_SUCCESS"), eq(tenant), anyString());
 
-        // Verify notification sent via NotificationService
-        verify(notificationService).notifyPaymentSuccess(any(RentPeriod.class));
+        // Verify event published via KafkaProducerService
+        verify(kafkaProducerService).sendPaymentSuccessEvent(any(PaymentSuccessEvent.class));
     }
 
     @Test
@@ -218,7 +219,7 @@ class PayTrServiceTest {
 
         assertTrue(ex.getMessage().contains("bad hash"));
         verifyNoInteractions(rentPeriodRepository);
-        verifyNoInteractions(notificationService);
+        verifyNoInteractions(kafkaProducerService);
     }
 
     @Test
@@ -246,6 +247,6 @@ class PayTrServiceTest {
         assertEquals("OK", result);
         assertNotEquals(PaymentStatus.PAID, rentPeriod.getStatus());
         verify(auditLogService).record(eq("RENT_PERIOD"), eq(50L), eq("PAYTR_PAYMENT_FAILED"), isNull(), contains("Yetersiz bakiye"));
-        verifyNoInteractions(notificationService);
+        verifyNoInteractions(kafkaProducerService);
     }
 }

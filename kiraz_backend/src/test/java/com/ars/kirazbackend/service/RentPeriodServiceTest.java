@@ -7,6 +7,8 @@ import com.ars.kirazbackend.entity.RentPeriod;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.enums.PaymentStatus;
 import com.ars.kirazbackend.enums.RoleType;
+import com.ars.kirazbackend.event.PaymentSuccessEvent;
+import com.ars.kirazbackend.event.ReceiptUploadedEvent;
 import com.ars.kirazbackend.repository.RentPeriodRepository;
 import com.ars.kirazbackend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +37,9 @@ class RentPeriodServiceTest {
 
     @Mock
     private FileStorageService fileStorageService;
+
+    @Mock
+    private KafkaProducerService kafkaProducerService;
 
     @Mock
     private NotificationService notificationService;
@@ -274,7 +279,7 @@ class RentPeriodServiceTest {
 
         verify(rentPeriodRepository).save(period);
         verify(auditLogService).record(eq("RENT_PERIOD"), eq(10L), eq("RECEIPT_UPLOADED"), eq(tenant), anyString());
-        verify(notificationService).notifyLandlordForReceipt(period);
+        verify(kafkaProducerService).sendReceiptUploadedEvent(any(ReceiptUploadedEvent.class));
     }
 
     @Test
@@ -298,6 +303,6 @@ class RentPeriodServiceTest {
 
         verify(rentPeriodRepository).save(period);
         verify(auditLogService).record(eq("RENT_PERIOD"), eq(20L), eq("PAYMENT_APPROVED"), any(), anyString());
-        verify(notificationService).notifyPaymentSuccess(period);
+        verify(kafkaProducerService).sendPaymentSuccessEvent(any(PaymentSuccessEvent.class));
     }
 }

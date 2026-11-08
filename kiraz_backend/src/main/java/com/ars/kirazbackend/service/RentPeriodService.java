@@ -6,6 +6,8 @@ import com.ars.kirazbackend.entity.RentPeriod;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.enums.PaymentStatus;
 import com.ars.kirazbackend.enums.RoleType;
+import com.ars.kirazbackend.event.PaymentSuccessEvent;
+import com.ars.kirazbackend.event.ReceiptUploadedEvent;
 import com.ars.kirazbackend.repository.RentPeriodRepository;
 import com.ars.kirazbackend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import java.util.List;
 public class RentPeriodService {
     private final RentPeriodRepository rentPeriodRepository;
     private final FileStorageService fileStorageService;
+    private final KafkaProducerService kafkaProducerService;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
     private final PropertyDelegationService propertyDelegationService;
@@ -225,7 +228,16 @@ public class RentPeriodService {
                         savedPeriod.getMonth(), savedPeriod.getYear())
         );
 
-        notificationService.notifyLandlordForReceipt(savedPeriod);
+        Long tenantId = (tenant != null) ? tenant.getId() : null;
+        Long leaseId = (savedPeriod.getLeaseAgreement() != null) ? savedPeriod.getLeaseAgreement().getId() : null;
+        kafkaProducerService.sendReceiptUploadedEvent(new ReceiptUploadedEvent(
+                savedPeriod.getId(),
+                tenantId,
+                leaseId,
+                fileUrl,
+                savedPeriod.getMonth(),
+                savedPeriod.getYear()
+        ));
 
         return savedPeriod;
     }
@@ -266,7 +278,21 @@ public class RentPeriodService {
         RentPeriod savedPeriod = rentPeriodRepository.save(period);
 
         if (paymentStatus == PaymentStatus.PAID) {
-            notificationService.notifyPaymentSuccess(savedPeriod);
+            Long tenantId = (savedPeriod.getLeaseAgreement() != null && savedPeriod.getLeaseAgreement().getTenant() != null)
+                    ? savedPeriod.getLeaseAgreement().getTenant().getId()
+                    : null;
+            Long leaseId = (savedPeriod.getLeaseAgreement() != null) ? savedPeriod.getLeaseAgreement().getId() : null;
+            Double amount = (savedPeriod.getLeaseAgreement() != null && savedPeriod.getLeaseAgreement().getMonthlyRentAmount() != null)
+                    ? savedPeriod.getLeaseAgreement().getMonthlyRentAmount().doubleValue()
+                    : null;
+
+            kafkaProducerService.sendPaymentSuccessEvent(new PaymentSuccessEvent(
+                    savedPeriod.getId(),
+                    tenantId,
+                    leaseId,
+                    amount,
+                    "MANUAL_APPROVAL"
+            ));
 
             User landlord = (savedPeriod.getLeaseAgreement() != null && savedPeriod.getLeaseAgreement().getProperty() != null)
                     ? savedPeriod.getLeaseAgreement().getProperty().getLandlord()
