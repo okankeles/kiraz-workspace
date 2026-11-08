@@ -2,6 +2,7 @@ package com.ars.kirazbackend.service;
 
 import com.ars.kirazbackend.config.KafkaConfig;
 import com.ars.kirazbackend.event.PaymentSuccessEvent;
+import com.ars.kirazbackend.event.ReceiptRejectedEvent;
 import com.ars.kirazbackend.event.ReceiptUploadedEvent;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -89,5 +90,31 @@ class KafkaProducerServiceTest {
 
         assertNotNull(result);
         verify(kafkaTemplate, times(1)).send(eq(KafkaConfig.PAYMENT_EVENTS_TOPIC), eq("201"), any(ReceiptUploadedEvent.class));
+    }
+
+    @Test
+    void testSendReceiptRejectedEvent_Success() {
+        ReceiptRejectedEvent event = new ReceiptRejectedEvent(300L, 40L, 9L, "Kadıköy Daire", "Eksik tutar", 11, 2026);
+        CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(mockSendResult);
+
+        when(kafkaTemplate.send(eq(KafkaConfig.PAYMENT_EVENTS_TOPIC), eq("300"), eq(event))).thenReturn(future);
+
+        CompletableFuture<SendResult<String, Object>> result = kafkaProducerService.sendReceiptRejectedEvent(event);
+
+        assertNotNull(result);
+        verify(kafkaTemplate, times(1)).send(eq(KafkaConfig.PAYMENT_EVENTS_TOPIC), eq("300"), eq(event));
+    }
+
+    @Test
+    void testSendReceiptRejectedEvent_Overload() {
+        CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(mockSendResult);
+        when(kafkaTemplate.send(eq(KafkaConfig.PAYMENT_EVENTS_TOPIC), eq("301"), any(ReceiptRejectedEvent.class)))
+                .thenReturn(future);
+
+        CompletableFuture<SendResult<String, Object>> result =
+                kafkaProducerService.sendReceiptRejectedEvent(301L, 41L, "Okunamayan dekont");
+
+        assertNotNull(result);
+        verify(kafkaTemplate, times(1)).send(eq(KafkaConfig.PAYMENT_EVENTS_TOPIC), eq("301"), any(ReceiptRejectedEvent.class));
     }
 }

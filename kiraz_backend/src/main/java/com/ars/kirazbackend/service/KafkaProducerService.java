@@ -2,6 +2,7 @@ package com.ars.kirazbackend.service;
 
 import com.ars.kirazbackend.config.KafkaConfig;
 import com.ars.kirazbackend.event.PaymentSuccessEvent;
+import com.ars.kirazbackend.event.ReceiptRejectedEvent;
 import com.ars.kirazbackend.event.ReceiptUploadedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,5 +63,28 @@ public class KafkaProducerService {
 
     public CompletableFuture<SendResult<String, Object>> sendReceiptUploadedEvent(Long periodId, Long tenantId, String receiptImageUrl) {
         return sendReceiptUploadedEvent(new ReceiptUploadedEvent(periodId, tenantId, receiptImageUrl));
+    }
+
+    public CompletableFuture<SendResult<String, Object>> sendReceiptRejectedEvent(ReceiptRejectedEvent event) {
+        String key = event.periodId() != null ? String.valueOf(event.periodId()) : null;
+        log.info("Sending ReceiptRejectedEvent to Kafka: topic={}, key={}, periodId={}, tenantId={}, reason={}",
+                KafkaConfig.PAYMENT_EVENTS_TOPIC, key, event.periodId(), event.tenantId(), event.reason());
+
+        return kafkaTemplate.send(KafkaConfig.PAYMENT_EVENTS_TOPIC, key, event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to publish ReceiptRejectedEvent: periodId={}, error={}",
+                                event.periodId(), ex.getMessage(), ex);
+                    } else {
+                        log.info("ReceiptRejectedEvent published successfully: topic={}, partition={}, offset={}",
+                                KafkaConfig.PAYMENT_EVENTS_TOPIC,
+                                result.getRecordMetadata().partition(),
+                                result.getRecordMetadata().offset());
+                    }
+                });
+    }
+
+    public CompletableFuture<SendResult<String, Object>> sendReceiptRejectedEvent(Long periodId, Long tenantId, String reason) {
+        return sendReceiptRejectedEvent(new ReceiptRejectedEvent(periodId, tenantId, reason));
     }
 }

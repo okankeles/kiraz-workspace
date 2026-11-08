@@ -120,4 +120,35 @@ class KafkaConsumerServiceTest {
 
         verify(notificationService, times(1)).notifyLandlordForReceipt(eq(mockPeriod));
     }
+
+    @Test
+    void testConsume_ReceiptRejectedEvent_TriggersNotification() {
+        com.ars.kirazbackend.event.ReceiptRejectedEvent event =
+                new com.ars.kirazbackend.event.ReceiptRejectedEvent(100L, 10L, "Eksik tutar");
+        ConsumerRecord<String, Object> record = new ConsumerRecord<>(
+                KafkaConfig.PAYMENT_EVENTS_TOPIC, 0, 3L, "100", event
+        );
+
+        when(rentPeriodRepository.findById(100L)).thenReturn(Optional.of(mockPeriod));
+
+        kafkaConsumerService.consume(record);
+
+        verify(rentPeriodRepository, times(1)).findById(100L);
+        verify(notificationService, times(1)).notifyReceiptRejected(eq(mockPeriod), eq("Eksik tutar"));
+        verifyNoMoreInteractions(notificationService);
+    }
+
+    @Test
+    void testConsume_RawJsonReceiptRejectedEvent_TriggersNotification() {
+        String json = "{\"periodId\":100,\"tenantId\":10,\"reason\":\"Dekont okunaksız\"}";
+        ConsumerRecord<String, Object> record = new ConsumerRecord<>(
+                KafkaConfig.PAYMENT_EVENTS_TOPIC, 0, 6L, "100", json
+        );
+
+        when(rentPeriodRepository.findById(100L)).thenReturn(Optional.of(mockPeriod));
+
+        kafkaConsumerService.consume(record);
+
+        verify(notificationService, times(1)).notifyReceiptRejected(eq(mockPeriod), eq("Dekont okunaksız"));
+    }
 }

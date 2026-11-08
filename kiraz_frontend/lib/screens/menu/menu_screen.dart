@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../main.dart';
 import '../auth/login_screen.dart';
+import '../landlord/receipt_approvals_screen.dart';
 import '../splash_screen.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -358,6 +359,24 @@ class _MenuScreenState extends State<MenuScreen> {
                     ],
                   ),
                 ),
+
+                // Ev Sahibi Finans & Tahsilat
+                if (_userRole == 'Ev Sahibi') ...[
+                  _buildSectionHeader('FİNANS & TAHSİLAT', textSecondary),
+                  _buildMenuItem(
+                    icon: Icons.receipt_long_rounded,
+                    title: 'Tahsilat Onayları',
+                    subtitle: 'Havale / EFT kira dekontu kontrolleri',
+                    iconColor: const Color(0xFFF59E0B),
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ReceiptApprovalsScreen()),
+                      );
+                    },
+                  ),
+                ],
 
                 // Hesap & Güvenlik
                 _buildSectionHeader('HESAP & GÜVENLİK', textSecondary),

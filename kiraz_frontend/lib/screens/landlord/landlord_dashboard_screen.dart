@@ -18,6 +18,7 @@ import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/cherry_logo.dart';
 import '../tenant/rent_period_list_screen.dart';
+import 'receipt_approvals_screen.dart';
 
 class LandlordDashboardScreen extends StatefulWidget {
   const LandlordDashboardScreen({super.key});
@@ -2145,6 +2146,32 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                   ),
                 ],
               ],
+            ),
+            TextButton(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ReceiptApprovalsScreen(),
+                  ),
+                );
+                _loadDashboardData();
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Tümünü Gör',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: vibrantBlue,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: vibrantBlue),
+                ],
+              ),
             ),
           ],
         ),

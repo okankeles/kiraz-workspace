@@ -192,4 +192,41 @@ public class NotificationService {
             }
         }
     }
+
+    /**
+     * Kiracının yüklediği dekont Ev Sahibi tarafından reddedildiğinde Kiracıya bildirim ve e-posta gönderir.
+     */
+    @Transactional
+    public void notifyReceiptRejected(RentPeriod period, String reason) {
+        if (period == null || period.getLeaseAgreement() == null) {
+            return;
+        }
+
+        User tenant = period.getLeaseAgreement().getTenant();
+        Property property = period.getLeaseAgreement().getProperty();
+        String propertyTitle = (property != null && property.getTitle() != null) ? property.getTitle() : "Taşınmaz";
+
+        String title = "Dekontunuz Reddedildi";
+        String reasonText = (reason != null && !reason.trim().isEmpty()) ? reason.trim() : "Ev sahibi tarafından reddedildi.";
+        String message = String.format("'%s' mülkünün %02d/%d dönemi kirası için yüklediğiniz dekont reddedildi: %s Lütfen yeni bir dekont yükleyin.",
+                propertyTitle, period.getMonth(), period.getYear(), reasonText);
+
+        if (tenant != null) {
+            createNotification(
+                    tenant.getId(),
+                    title,
+                    message,
+                    "RECEIPT_REJECTED",
+                    period.getLeaseAgreement().getId()
+            );
+
+            if (tenant.getEmail() != null && !tenant.getEmail().trim().isEmpty()) {
+                emailService.sendNotificationEmail(
+                        tenant.getEmail(),
+                        "kiraZ - " + title,
+                        "Sayın " + tenant.getFullName() + ",\n\n" + message + "\n\nkiraZ Yönetim Sistemi"
+                );
+            }
+        }
+    }
 }

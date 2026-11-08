@@ -2,6 +2,7 @@ package com.ars.kirazbackend.service;
 
 import com.ars.kirazbackend.entity.RentPeriod;
 import com.ars.kirazbackend.event.PaymentSuccessEvent;
+import com.ars.kirazbackend.event.ReceiptRejectedEvent;
 import com.ars.kirazbackend.event.ReceiptUploadedEvent;
 import com.ars.kirazbackend.repository.RentPeriodRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -33,6 +34,8 @@ public class KafkaConsumerService {
             handlePaymentSuccess(event);
         } else if (payload instanceof ReceiptUploadedEvent event) {
             handleReceiptUploaded(event);
+        } else if (payload instanceof ReceiptRejectedEvent event) {
+            handleReceiptRejected(event);
         } else if (payload instanceof String jsonStr) {
             handleRawJson(jsonStr);
         } else if (payload != null) {
@@ -78,12 +81,33 @@ public class KafkaConsumerService {
         }
     }
 
+    public void handleReceiptRejected(ReceiptRejectedEvent event) {
+        log.info("Handling ReceiptRejectedEvent: periodId={}, tenantId={}, reason={}",
+                event.periodId(), event.tenantId(), event.reason());
+
+        if (event.periodId() == null) {
+            log.warn("ReceiptRejectedEvent has no periodId, skipping notification.");
+            return;
+        }
+
+        RentPeriod period = rentPeriodRepository.findById(event.periodId()).orElse(null);
+        if (period != null) {
+            notificationService.notifyReceiptRejected(period, event.reason());
+            log.info("Successfully triggered notifyReceiptRejected for periodId={}", event.periodId());
+        } else {
+            log.error("RentPeriod not found for periodId={} in ReceiptRejectedEvent", event.periodId());
+        }
+    }
+
     private void handleRawJson(String jsonStr) {
         try {
             JsonNode root = objectMapper.readTree(jsonStr);
             if (root.has("receiptImageUrl") || root.has("ReceiptUploadedEvent")) {
                 ReceiptUploadedEvent event = objectMapper.treeToValue(root, ReceiptUploadedEvent.class);
                 handleReceiptUploaded(event);
+            } else if (root.has("reason") || root.has("ReceiptRejectedEvent")) {
+                ReceiptRejectedEvent event = objectMapper.treeToValue(root, ReceiptRejectedEvent.class);
+                handleReceiptRejected(event);
             } else {
                 PaymentSuccessEvent event = objectMapper.treeToValue(root, PaymentSuccessEvent.class);
                 handlePaymentSuccess(event);
@@ -99,6 +123,9 @@ public class KafkaConsumerService {
             if (tree.has("receiptImageUrl")) {
                 ReceiptUploadedEvent event = objectMapper.treeToValue(tree, ReceiptUploadedEvent.class);
                 handleReceiptUploaded(event);
+            } else if (tree.has("reason")) {
+                ReceiptRejectedEvent event = objectMapper.treeToValue(tree, ReceiptRejectedEvent.class);
+                handleReceiptRejected(event);
             } else {
                 PaymentSuccessEvent event = objectMapper.treeToValue(tree, PaymentSuccessEvent.class);
                 handlePaymentSuccess(event);
