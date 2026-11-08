@@ -1,11 +1,14 @@
 package com.ars.kirazbackend.service;
 
+import com.ars.kirazbackend.dto.DelegationRequestDto;
+import com.ars.kirazbackend.dto.DelegationResponseDto;
 import com.ars.kirazbackend.dto.PropertyDelegationRequest;
 import com.ars.kirazbackend.entity.Property;
 import com.ars.kirazbackend.entity.PropertyDelegation;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.enums.DelegationStatus;
 import com.ars.kirazbackend.enums.RoleType;
+import com.ars.kirazbackend.event.ManagerAssignedEvent;
 import com.ars.kirazbackend.repository.PropertyDelegationRepository;
 import com.ars.kirazbackend.repository.PropertyRepository;
 import com.ars.kirazbackend.repository.UserRepository;
@@ -34,6 +37,7 @@ public class PropertyDelegationService {
     private final AuditLogService auditLogService;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final KafkaProducerService kafkaProducerService;
 
     @Transactional
     public PropertyDelegation assignAgent(PropertyDelegationRequest request) {
@@ -261,6 +265,148 @@ public class PropertyDelegationService {
 
     public List<PropertyDelegation> getDelegationsGrantedBy(Long landlordId) {
         return delegationRepository.findByGrantedByIdOrderByCreatedAtDesc(landlordId);
+    }
+
+    /**
+     * Faz 4: Ev Sahibi tarafından bir Mülk Yöneticisi (Property Manager) atanması.
+     * Mülk bulunur, managerEmail'e sahip PROPERTY_MANAGER/AGENT bulunur,
+     * önceki aktif yetkiler sonlandırılır, mülkün statüsü güncellenir,
+     * vekalet ACTIVE olarak kaydedilir ve Kafka ManagerAssignedEvent fırlatılır.
+     */
+    @Transactional
+    public DelegationResponseDto assignManager(DelegationRequestDto request, User landlord) {
+        if (request == null || request.propertyId() == null || request.managerEmail() == null) {
+            throw new RuntimeException("PropertyId ve ManagerEmail zorunludur!");
+        }
+
+        Property property = propertyRepository.findById(request.propertyId())
+                .orElseThrow(() -> new RuntimeException("Mülk bulunamadı: " + request.propertyId()));
+
+        String managerEmail = request.managerEmail().trim();
+
+        User manager = userRepository.findByEmail(managerEmail)
+                .orElseThrow(() -> new RuntimeException("Belirtilen e-posta ile mülk yöneticisi bulunamadı: " + managerEmail));
+
+        if (manager.getRole() != RoleType.PROPERTY_MANAGER && manager.getRole() != RoleType.AGENT) {
+            throw new RuntimeException("Kullanıcı PROPERTY_MANAGER rolüne sahip değil: " + managerEmail);
+        }
+
+        if (landlord != null && !property.getLandlord().getId().equals(landlord.getId())) {
+            throw new RuntimeException("Yalnızca mülk sahibi emlakçı vekaleti verebilir!");
+        }
+
+        User effectiveLandlord = landlord != null ? landlord : property.getLandlord();
+
+        // Önceki aktif vekaletlerin statüsünü REVOKED yap
+        List<PropertyDelegation> existingActiveList = delegationRepository.findByPropertyIdAndStatus(
+                property.getId(), DelegationStatus.ACTIVE
+        );
+        for (PropertyDelegation existing : existingActiveList) {
+            existing.setStatus(DelegationStatus.REVOKED);
+            existing.setRevokedAt(LocalDateTime.now());
+            existing.setRevocationReason("Yeni mülk yöneticisi (" + manager.getFullName() + ") atandı");
+            delegationRepository.save(existing);
+        }
+
+        // Mülkün statüsünü güncelle
+        property.setStatus("DELEGATED");
+        propertyRepository.save(property);
+
+        // Yeni vekalet oluştur
+        PropertyDelegation delegation = PropertyDelegation.builder()
+                .property(property)
+                .agent(manager)
+                .grantedBy(effectiveLandlord)
+                .status(DelegationStatus.ACTIVE)
+                .startDate(LocalDate.now())
+                .build();
+
+        PropertyDelegation saved = delegationRepository.save(delegation);
+
+        // Audit Log
+        auditLogService.record(
+                "PROPERTY_DELEGATION",
+                saved.getId(),
+                "MANAGER_ASSIGNED",
+                effectiveLandlord,
+                String.format("'%s' mülkü, %s (%s) adlı mülk yöneticisine devredildi.",
+                        property.getTitle(), manager.getFullName(), manager.getEmail())
+        );
+
+        // Sistem içi bildirim
+        notificationService.createNotification(
+                manager.getId(),
+                "Yeni Mülk Yetkilendirmesi",
+                String.format("'%s' mülkü için mülk yöneticisi olarak yetkilendirildiniz.", property.getTitle()),
+                "DELEGATION",
+                saved.getId()
+        );
+
+        // Kafka ManagerAssignedEvent
+        kafkaProducerService.sendManagerAssignedEvent(new ManagerAssignedEvent(
+                property.getId(),
+                property.getTitle(),
+                manager.getEmail(),
+                effectiveLandlord.getFullName()
+        ));
+
+        return DelegationResponseDto.fromEntity(saved);
+    }
+
+    @Transactional
+    public DelegationResponseDto assignManager(DelegationRequestDto request) {
+        return assignManager(request, null);
+    }
+
+    /**
+     * Faz 4: Yetki iptali (statüyü INACTIVE veya REVOKED yapar).
+     */
+    @Transactional
+    public DelegationResponseDto revokeDelegationDto(Long delegationId, Long landlordId) {
+        PropertyDelegation delegation = revokeDelegation(delegationId, landlordId, "Ev sahibi tarafından yetki iptal edildi");
+
+        // Mülke ait başka aktif vekalet kalıp kalmadığını kontrol et
+        List<PropertyDelegation> activeList = delegationRepository.findByPropertyIdAndStatus(
+                delegation.getProperty().getId(), DelegationStatus.ACTIVE
+        );
+        if (activeList.isEmpty()) {
+            delegation.getProperty().setStatus("AVAILABLE");
+            propertyRepository.save(delegation.getProperty());
+        }
+
+        return DelegationResponseDto.fromEntity(delegation);
+    }
+
+    @Transactional
+    public DelegationResponseDto revokeDelegation(Long delegationId) {
+        return revokeDelegationDto(delegationId, null);
+    }
+
+    /**
+     * Faz 4: Ev sahibinin verdiği yetkileri listele.
+     */
+    @Transactional(readOnly = true)
+    public List<DelegationResponseDto> getLandlordDelegations(Long landlordId) {
+        if (landlordId == null) {
+            return java.util.Collections.emptyList();
+        }
+        List<PropertyDelegation> list = delegationRepository.findByGrantedByIdOrderByCreatedAtDesc(landlordId);
+        return list.stream().map(DelegationResponseDto::fromEntity).toList();
+    }
+
+    /**
+     * Faz 4: Emlakçının kendine atanan mülkleri listelemesi.
+     */
+    @Transactional(readOnly = true)
+    public List<Property> getManagerProperties(Long managerId) {
+        if (managerId == null) {
+            return java.util.Collections.emptyList();
+        }
+        List<PropertyDelegation> activeDelegations = getActiveDelegationsForAgent(managerId);
+        return activeDelegations.stream()
+                .map(PropertyDelegation::getProperty)
+                .distinct()
+                .toList();
     }
 
     private String generateUniqueAgentReferenceCode() {

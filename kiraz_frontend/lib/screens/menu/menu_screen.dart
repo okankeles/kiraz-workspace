@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../main.dart';
 import '../auth/login_screen.dart';
+import '../landlord/delegations_screen.dart';
 import '../landlord/receipt_approvals_screen.dart';
 import '../splash_screen.dart';
 
@@ -373,6 +374,19 @@ class _MenuScreenState extends State<MenuScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const ReceiptApprovalsScreen()),
+                      );
+                    },
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.real_estate_agent_rounded,
+                    title: 'Emlakçı Yetkilendirmeleri',
+                    subtitle: 'Mülklerinize atanan emlak danışmanları',
+                    iconColor: const Color(0xFF1E50CE),
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const DelegationsScreen()),
                       );
                     },
                   ),

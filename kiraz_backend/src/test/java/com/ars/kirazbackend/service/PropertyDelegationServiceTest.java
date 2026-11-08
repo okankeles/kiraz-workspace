@@ -50,6 +50,9 @@ class PropertyDelegationServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private KafkaProducerService kafkaProducerService;
+
     @InjectMocks
     private PropertyDelegationService delegationService;
 
@@ -250,5 +253,102 @@ class PropertyDelegationServiceTest {
         assertFalse(hasActive);
         assertEquals(DelegationStatus.EXPIRED, expiredDelegation.getStatus());
         verify(delegationRepository, times(1)).save(expiredDelegation);
+    }
+
+    @Test
+    void testAssignManager_Success() {
+        User manager = User.builder()
+                .id(15L)
+                .email("manager@emlak.com")
+                .fullName("Mülk Yöneticisi")
+                .role(RoleType.PROPERTY_MANAGER)
+                .build();
+
+        when(propertyRepository.findById(10L)).thenReturn(Optional.of(property));
+        when(userRepository.findByEmail("manager@emlak.com")).thenReturn(Optional.of(manager));
+        when(delegationRepository.findByPropertyIdAndStatus(10L, DelegationStatus.ACTIVE))
+                .thenReturn(new ArrayList<>());
+        when(delegationRepository.save(any(PropertyDelegation.class)))
+                .thenAnswer(inv -> {
+                    PropertyDelegation pd = inv.getArgument(0);
+                    pd.setId(88L);
+                    return pd;
+                });
+
+        com.ars.kirazbackend.dto.DelegationRequestDto request =
+                new com.ars.kirazbackend.dto.DelegationRequestDto(10L, "manager@emlak.com");
+
+        com.ars.kirazbackend.dto.DelegationResponseDto response = delegationService.assignManager(request, landlord);
+
+        assertNotNull(response);
+        assertEquals(88L, response.id());
+        assertEquals("Kadıköy 2+1 Daire", response.propertyName());
+        assertEquals("Mülk Yöneticisi", response.managerName());
+        assertEquals("manager@emlak.com", response.managerEmail());
+        assertEquals("ACTIVE", response.status());
+
+        assertEquals("DELEGATED", property.getStatus());
+        verify(propertyRepository).save(property);
+        verify(kafkaProducerService).sendManagerAssignedEvent(any(com.ars.kirazbackend.event.ManagerAssignedEvent.class));
+    }
+
+    @Test
+    void testRevokeDelegation_RestoresPropertyStatusWhenNoActive() {
+        property.setStatus("DELEGATED");
+        PropertyDelegation delegation = PropertyDelegation.builder()
+                .id(88L)
+                .property(property)
+                .agent(agent)
+                .grantedBy(landlord)
+                .status(DelegationStatus.ACTIVE)
+                .build();
+
+        when(delegationRepository.findById(88L)).thenReturn(Optional.of(delegation));
+        when(delegationRepository.save(any(PropertyDelegation.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(delegationRepository.findByPropertyIdAndStatus(10L, DelegationStatus.ACTIVE)).thenReturn(List.of());
+
+        com.ars.kirazbackend.dto.DelegationResponseDto response = delegationService.revokeDelegation(88L);
+
+        assertNotNull(response);
+        assertEquals("REVOKED", response.status());
+        assertEquals("AVAILABLE", property.getStatus());
+        verify(propertyRepository).save(property);
+    }
+
+    @Test
+    void testGetLandlordDelegations() {
+        PropertyDelegation delegation = PropertyDelegation.builder()
+                .id(88L)
+                .property(property)
+                .agent(agent)
+                .grantedBy(landlord)
+                .status(DelegationStatus.ACTIVE)
+                .startDate(LocalDate.now())
+                .build();
+
+        when(delegationRepository.findByGrantedByIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(delegation));
+
+        List<com.ars.kirazbackend.dto.DelegationResponseDto> result = delegationService.getLandlordDelegations(1L);
+
+        assertEquals(1, result.size());
+        assertEquals("Kadıköy 2+1 Daire", result.get(0).propertyName());
+    }
+
+    @Test
+    void testGetManagerProperties() {
+        PropertyDelegation delegation = PropertyDelegation.builder()
+                .id(88L)
+                .property(property)
+                .agent(agent)
+                .status(DelegationStatus.ACTIVE)
+                .build();
+
+        when(delegationRepository.findByAgentIdAndStatus(2L, DelegationStatus.ACTIVE))
+                .thenReturn(List.of(delegation));
+
+        List<Property> result = delegationService.getManagerProperties(2L);
+
+        assertEquals(1, result.size());
+        assertEquals(10L, result.get(0).getId());
     }
 }

@@ -36,6 +36,9 @@ class NotificationServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private com.ars.kirazbackend.repository.UserRepository userRepository;
+
     @InjectMocks
     private NotificationService notificationService;
 
@@ -188,5 +191,27 @@ class NotificationServiceTest {
 
         verifyNoInteractions(emailService);
         verify(notificationRepository, never()).save(any());
+    }
+
+    @Test
+    void testNotifyManagerAssigned_Success() {
+        when(userRepository.findByEmail("can@emlak.com")).thenReturn(java.util.Optional.of(agent));
+
+        com.ars.kirazbackend.event.ManagerAssignedEvent event =
+                new com.ars.kirazbackend.event.ManagerAssignedEvent(10L, "Göztepe 2+1", "can@emlak.com", "Ali Kaya");
+
+        notificationService.notifyManagerAssigned(event);
+
+        verify(notificationRepository).save(argThat(n ->
+                n.getUserId().equals(3L) &&
+                n.getTitle().equals("Yeni Mülk Yetkilendirmesi") &&
+                n.getType().equals("MANAGER_ASSIGNED")
+        ));
+
+        verify(emailService).sendNotificationEmail(
+                eq("can@emlak.com"),
+                contains("Yeni Mülk Yetkilendirmesi"),
+                contains("Ali Kaya")
+        );
     }
 }

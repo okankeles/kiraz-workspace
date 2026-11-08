@@ -36,6 +36,8 @@ public class KafkaConsumerService {
             handleReceiptUploaded(event);
         } else if (payload instanceof ReceiptRejectedEvent event) {
             handleReceiptRejected(event);
+        } else if (payload instanceof com.ars.kirazbackend.event.ManagerAssignedEvent event) {
+            handleManagerAssigned(event);
         } else if (payload instanceof String jsonStr) {
             handleRawJson(jsonStr);
         } else if (payload != null) {
@@ -99,6 +101,15 @@ public class KafkaConsumerService {
         }
     }
 
+    public void handleManagerAssigned(com.ars.kirazbackend.event.ManagerAssignedEvent event) {
+        log.info("Handling ManagerAssignedEvent: propertyId={}, propertyName={}, managerEmail={}",
+                event.propertyId(), event.propertyName(), event.managerEmail());
+
+        notificationService.notifyManagerAssigned(event);
+        log.info("Successfully triggered notifyManagerAssigned for propertyId={}, managerEmail={}",
+                event.propertyId(), event.managerEmail());
+    }
+
     private void handleRawJson(String jsonStr) {
         try {
             JsonNode root = objectMapper.readTree(jsonStr);
@@ -108,6 +119,10 @@ public class KafkaConsumerService {
             } else if (root.has("reason") || root.has("ReceiptRejectedEvent")) {
                 ReceiptRejectedEvent event = objectMapper.treeToValue(root, ReceiptRejectedEvent.class);
                 handleReceiptRejected(event);
+            } else if (root.has("managerEmail") || root.has("ManagerAssignedEvent")) {
+                com.ars.kirazbackend.event.ManagerAssignedEvent event =
+                        objectMapper.treeToValue(root, com.ars.kirazbackend.event.ManagerAssignedEvent.class);
+                handleManagerAssigned(event);
             } else {
                 PaymentSuccessEvent event = objectMapper.treeToValue(root, PaymentSuccessEvent.class);
                 handlePaymentSuccess(event);
@@ -126,6 +141,10 @@ public class KafkaConsumerService {
             } else if (tree.has("reason")) {
                 ReceiptRejectedEvent event = objectMapper.treeToValue(tree, ReceiptRejectedEvent.class);
                 handleReceiptRejected(event);
+            } else if (tree.has("managerEmail")) {
+                com.ars.kirazbackend.event.ManagerAssignedEvent event =
+                        objectMapper.treeToValue(tree, com.ars.kirazbackend.event.ManagerAssignedEvent.class);
+                handleManagerAssigned(event);
             } else {
                 PaymentSuccessEvent event = objectMapper.treeToValue(tree, PaymentSuccessEvent.class);
                 handlePaymentSuccess(event);

@@ -36,7 +36,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedRole = widget.initialRole ?? 'LANDLORD';
+    final initial = widget.initialRole ?? 'LANDLORD';
+    _selectedRole = (initial == 'PROPERTY_MANAGER' || initial == 'AGENT') ? 'AGENT' : initial;
   }
 
   @override

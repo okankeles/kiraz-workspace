@@ -23,6 +23,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final PropertyDelegationRepository propertyDelegationRepository;
     private final EmailService emailService;
+    private final com.ars.kirazbackend.repository.UserRepository userRepository;
 
     @Transactional
     public Notification createNotification(Long userId, String title, String message, String type, Long referenceId) {
@@ -229,4 +230,44 @@ public class NotificationService {
             }
         }
     }
+
+    /**
+     * Emlakçı/Mülk Yöneticisi bir mülke atandığında (ManagerAssignedEvent) bildirim ve e-posta gönderir.
+     */
+    @Transactional
+    public void notifyManagerAssigned(com.ars.kirazbackend.event.ManagerAssignedEvent event) {
+        if (event == null || event.managerEmail() == null) {
+            return;
+        }
+
+        String title = "Yeni Mülk Yetkilendirmesi";
+        String landlord = (event.landlordName() != null && !event.landlordName().trim().isEmpty())
+                ? event.landlordName()
+                : "Ev Sahibi";
+        String propTitle = (event.propertyName() != null && !event.propertyName().trim().isEmpty())
+                ? event.propertyName()
+                : "Taşınmaz";
+
+        String message = String.format("Sayın %s tarafından '%s' mülkünün yönetimi size devredilmiştir.",
+                landlord, propTitle);
+
+        if (userRepository != null) {
+            userRepository.findByEmail(event.managerEmail().trim()).ifPresent(manager -> {
+                createNotification(
+                        manager.getId(),
+                        title,
+                        message,
+                        "MANAGER_ASSIGNED",
+                        event.propertyId()
+                );
+            });
+        }
+
+        emailService.sendNotificationEmail(
+                event.managerEmail().trim(),
+                "kiraZ - " + title,
+                "Sayın Mülk Yöneticisi,\n\n" + message + "\n\nkiraZ Gayrimenkul Yönetim Sistemi"
+        );
+    }
 }
+

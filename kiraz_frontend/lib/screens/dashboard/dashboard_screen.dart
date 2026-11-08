@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../agent/agent_dashboard_screen.dart';
 import '../auth/login_screen.dart';
+import '../manager/manager_dashboard_screen.dart';
 import '../landlord/landlord_main_screen.dart';
 import '../tenant/tenant_main_screen.dart';
 
@@ -54,6 +55,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    if (_userRole == 'PROPERTY_MANAGER' || _userRole == 'MANAGER') {
+      return const ManagerDashboardScreen();
+    }
+
     if (_userRole == 'AGENT') {
       return const AgentDashboardScreen();
     }
@@ -82,6 +87,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
+    }
+
+    if (_userRole == 'PROPERTY_MANAGER' || _userRole == 'MANAGER') {
+      return const ManagerDashboardScreen();
     }
 
     if (_userRole == 'AGENT') {

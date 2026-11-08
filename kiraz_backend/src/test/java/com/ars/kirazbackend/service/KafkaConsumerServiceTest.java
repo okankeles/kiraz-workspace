@@ -151,4 +151,34 @@ class KafkaConsumerServiceTest {
 
         verify(notificationService, times(1)).notifyReceiptRejected(eq(mockPeriod), eq("Dekont okunaksız"));
     }
+
+    @Test
+    void testConsume_ManagerAssignedEvent_TriggersNotification() {
+        com.ars.kirazbackend.event.ManagerAssignedEvent event =
+                new com.ars.kirazbackend.event.ManagerAssignedEvent(400L, "Moda 3+1", "manager@kiraz.app", "Ali Kaya");
+        ConsumerRecord<String, Object> record = new ConsumerRecord<>(
+                KafkaConfig.PAYMENT_EVENTS_TOPIC, 0, 7L, "400", event
+        );
+
+        kafkaConsumerService.consume(record);
+
+        verify(notificationService, times(1)).notifyManagerAssigned(eq(event));
+    }
+
+    @Test
+    void testConsume_RawJsonManagerAssignedEvent_TriggersNotification() {
+        String json = "{\"propertyId\":400,\"propertyName\":\"Moda 3+1\",\"managerEmail\":\"manager@kiraz.app\",\"landlordName\":\"Ali Kaya\"}";
+        ConsumerRecord<String, Object> record = new ConsumerRecord<>(
+                KafkaConfig.PAYMENT_EVENTS_TOPIC, 0, 8L, "400", json
+        );
+
+        kafkaConsumerService.consume(record);
+
+        verify(notificationService, times(1)).notifyManagerAssigned(argThat(event ->
+                event.propertyId().equals(400L) &&
+                event.propertyName().equals("Moda 3+1") &&
+                event.managerEmail().equals("manager@kiraz.app") &&
+                event.landlordName().equals("Ali Kaya")
+        ));
+    }
 }

@@ -87,4 +87,27 @@ public class KafkaProducerService {
     public CompletableFuture<SendResult<String, Object>> sendReceiptRejectedEvent(Long periodId, Long tenantId, String reason) {
         return sendReceiptRejectedEvent(new ReceiptRejectedEvent(periodId, tenantId, reason));
     }
+
+    public CompletableFuture<SendResult<String, Object>> sendManagerAssignedEvent(com.ars.kirazbackend.event.ManagerAssignedEvent event) {
+        String key = event.propertyId() != null ? String.valueOf(event.propertyId()) : null;
+        log.info("Sending ManagerAssignedEvent to Kafka: topic={}, key={}, propertyId={}, managerEmail={}",
+                KafkaConfig.PAYMENT_EVENTS_TOPIC, key, event.propertyId(), event.managerEmail());
+
+        return kafkaTemplate.send(KafkaConfig.PAYMENT_EVENTS_TOPIC, key, event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Failed to publish ManagerAssignedEvent: propertyId={}, error={}",
+                                event.propertyId(), ex.getMessage(), ex);
+                    } else {
+                        log.info("ManagerAssignedEvent published successfully: topic={}, partition={}, offset={}",
+                                KafkaConfig.PAYMENT_EVENTS_TOPIC,
+                                result.getRecordMetadata().partition(),
+                                result.getRecordMetadata().offset());
+                    }
+                });
+    }
+
+    public CompletableFuture<SendResult<String, Object>> sendManagerAssignedEvent(Long propertyId, String propertyName, String managerEmail, String landlordName) {
+        return sendManagerAssignedEvent(new com.ars.kirazbackend.event.ManagerAssignedEvent(propertyId, propertyName, managerEmail, landlordName));
+    }
 }

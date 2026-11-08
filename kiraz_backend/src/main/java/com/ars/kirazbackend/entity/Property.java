@@ -47,6 +47,8 @@ public class Property {
 
     private LocalDate daskEndDate;
 
+    private String status;
+
     @Transient
     private String tenantName;
 

@@ -37,6 +37,13 @@ public class UserAuthenticationFilter extends OncePerRequestFilter {
                 if (user.getRole() != null) {
                     authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
                     authorities.add(new SimpleGrantedAuthority(user.getRole().name()));
+                    if (user.getRole() == com.ars.kirazbackend.enums.RoleType.AGENT ||
+                        user.getRole() == com.ars.kirazbackend.enums.RoleType.PROPERTY_MANAGER) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_PROPERTY_MANAGER"));
+                        authorities.add(new SimpleGrantedAuthority("PROPERTY_MANAGER"));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_AGENT"));
+                        authorities.add(new SimpleGrantedAuthority("AGENT"));
+                    }
                 }
 
                 UsernamePasswordAuthenticationToken authentication =
