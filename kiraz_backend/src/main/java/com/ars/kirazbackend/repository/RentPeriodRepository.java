@@ -27,4 +27,11 @@ public interface RentPeriodRepository extends JpaRepository<RentPeriod, Long> {
 
     @Query("SELECT r FROM RentPeriod r WHERE r.leaseAgreement.tenant.id = :tenantId ORDER BY r.periodStart ASC")
     List<RentPeriod> findByTenantId(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT r FROM RentPeriod r " +
+           "JOIN FETCH r.leaseAgreement l " +
+           "JOIN FETCH l.property p " +
+           "LEFT JOIN FETCH l.tenant t " +
+           "WHERE p.landlord.id = :landlordId")
+    List<RentPeriod> findByLandlordId(@Param("landlordId") Long landlordId);
 }

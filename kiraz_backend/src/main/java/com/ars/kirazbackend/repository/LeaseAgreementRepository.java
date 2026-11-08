@@ -15,7 +15,10 @@ public interface LeaseAgreementRepository extends JpaRepository<LeaseAgreement, 
     @Query("SELECT l FROM LeaseAgreement l WHERE l.tenant.id = :tenantId")
     List<LeaseAgreement> findByTenantId(@Param("tenantId") Long tenantId);
 
-    @Query("SELECT l FROM LeaseAgreement l WHERE l.property.landlord.id = :landlordId")
+    @Query("SELECT l FROM LeaseAgreement l " +
+           "JOIN FETCH l.property p " +
+           "LEFT JOIN FETCH l.tenant t " +
+           "WHERE p.landlord.id = :landlordId")
     List<LeaseAgreement> findByPropertyLandlordId(@Param("landlordId") Long landlordId);
 
     @Query("SELECT l FROM LeaseAgreement l WHERE l.property.id = :propertyId")

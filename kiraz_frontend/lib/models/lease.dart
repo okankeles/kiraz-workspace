@@ -19,6 +19,7 @@ class Lease {
   final double? depositAmount;
   final String? landlordName;
   final String? landlordEmail;
+  final String? endDate;
 
   Lease({
     required this.id,
@@ -41,6 +42,7 @@ class Lease {
     this.depositAmount,
     this.landlordName,
     this.landlordEmail,
+    this.endDate,
   });
 
   bool get isPendingLandlordApproval =>
@@ -148,6 +150,7 @@ class Lease {
           : (json['deposit'] != null ? parseAmount(json['deposit']) : null),
       landlordName: lName,
       landlordEmail: lEmail,
+      endDate: json['endDate']?.toString() ?? json['contractEndDate']?.toString(),
     );
   }
 }

@@ -39,6 +39,7 @@ public class SecurityConfig {
                     "/api/delegations/**",
                     "/api/audit-logs/**",
                     "/api/dashboard/**",
+                    "/api/landlord/**",
                     "/api/notifications/**",
                     "/api/payments/**",
                     "/uploads/**",
