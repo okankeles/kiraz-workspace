@@ -1,32 +1,40 @@
+server:
+  port: ${SERVER_PORT:8080}
+
 spring:
   application:
     name: kiraz-backend
+  config:
+    import:
+      - "optional:file:../.env[.properties]"
+      - "optional:file:.env[.properties]"
   datasource:
-    url: jdbc:postgresql://localhost:5433/kiraz_db
-    username: ars_admin
-    password: ars_password_2026
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: kelesokann@gmail.com
-    password: dijsrthnskyamgha
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT}
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+        debug: false
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -39,11 +47,25 @@ spring:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "com.ars.kirazbackend.*,com.ars.kirazbackend.event.*"
 
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-minutes: 15
+  refresh-token-expiration-days: 14
+
 paytr:
-  merchant-id: "659790"
-  merchant-key: "XQTmSzbmBw5YAYzW"
-  merchant-salt: "K5uAP8fQ5htrfKd4"
-  test-mode: "1"
-  ok-url: "https://kiraz.app/payment-success"
-  fail-url: "https://kiraz.app/payment-fail"
+  merchant-id: ${PAYTR_MERCHANT_ID}
+  merchant-key: ${PAYTR_MERCHANT_KEY}
+  merchant-salt: ${PAYTR_MERCHANT_SALT}
+  test-mode: ${PAYTR_TEST_MODE:1}
+  ok-url: ${PAYTR_OK_URL:https://kiraz.app/payment-success}
+  fail-url: ${PAYTR_FAIL_URL:https://kiraz.app/payment-fail}
   timeout-limit: "30"
+
+cloudinary:
+  url: ${CLOUDINARY_URL:}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

@@ -1,0 +1,6 @@
+# Development Profile Configuration
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
