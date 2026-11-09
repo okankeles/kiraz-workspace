@@ -4,18 +4,16 @@ import com.ars.kirazbackend.dto.InviteValidationResponse;
 import com.ars.kirazbackend.dto.LeaseRequest;
 import com.ars.kirazbackend.entity.LeaseAgreement;
 import com.ars.kirazbackend.entity.RentPeriod;
+import com.ars.kirazbackend.entity.User;
+import com.ars.kirazbackend.enums.RoleType;
+import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.LeaseService;
 import com.ars.kirazbackend.service.RentPeriodService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -24,12 +22,30 @@ import java.util.List;
 @RequestMapping("/api/leases")
 @RequiredArgsConstructor
 public class LeaseController {
+
     private final LeaseService leaseService;
     private final RentPeriodService rentPeriodService;
+    private final AccessControlService authz;
 
     @PostMapping
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LANDLORD', 'AGENT')")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER')")
     public ResponseEntity<LeaseAgreement> createLease(@RequestBody LeaseRequest request) {
+        User creator = authz.getCurrentUser();
+        if (creator == null || creator.getId() == null) {
+            throw new RuntimeException("Kullanıcı kimliği belirlenemedi.");
+        }
+
+        // Mülk üzerinde işlem yapma yetkisi
+        authz.checkCanManageProperty(request.getPropertyId());
+
+        // Body'deki agentId / createdById parametrelerine güvenilmez: kimlik token'dan gelir
+        if (creator.getRole() == RoleType.AGENT || creator.getRole() == RoleType.PROPERTY_MANAGER) {
+            request.setAgentId(creator.getId());
+        } else {
+            request.setAgentId(null);
+        }
+        request.setCreatedById(creator.getId());
+
         return ResponseEntity.ok(leaseService.createLease(request));
     }
 
@@ -58,63 +74,88 @@ public class LeaseController {
     }
 
     @GetMapping("/property/{propertyId}")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
     public ResponseEntity<List<LeaseAgreement>> getLeasesForProperty(@PathVariable Long propertyId) {
+        authz.checkCanViewProperty(propertyId);
         return ResponseEntity.ok(leaseService.getLeasesForProperty(propertyId));
     }
 
-    @GetMapping("/tenant/{tenantId}")
-    public ResponseEntity<List<LeaseAgreement>> getLeasesForTenant(@PathVariable Long tenantId) {
-        return ResponseEntity.ok(leaseService.getLeasesForTenant(tenantId));
+    @GetMapping("/tenant")
+    @PreAuthorize("hasRole('TENANT')")
+    public ResponseEntity<List<LeaseAgreement>> getLeasesForTenant() {
+        User tenant = authz.getCurrentUser();
+        if (tenant == null || tenant.getId() == null) {
+            throw new RuntimeException("Kiracı kimliği belirlenemedi.");
+        }
+        return ResponseEntity.ok(leaseService.getLeasesForTenant(tenant.getId()));
     }
 
-    @GetMapping("/landlord/{landlordId}")
-    public ResponseEntity<List<LeaseAgreement>> getLeasesForLandlord(@PathVariable Long landlordId) {
-        return ResponseEntity.ok(leaseService.getLeasesForLandlord(landlordId));
+    @GetMapping("/landlord")
+    @PreAuthorize("hasRole('LANDLORD')")
+    public ResponseEntity<List<LeaseAgreement>> getLeasesForLandlord() {
+        User landlord = authz.getCurrentUser();
+        if (landlord == null || landlord.getId() == null) {
+            throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
+        }
+        return ResponseEntity.ok(leaseService.getLeasesForLandlord(landlord.getId()));
+    }
+
+    @GetMapping("/pending-approvals")
+    @PreAuthorize("hasRole('LANDLORD')")
+    public ResponseEntity<List<LeaseAgreement>> getPendingApprovals() {
+        User landlord = authz.getCurrentUser();
+        if (landlord == null || landlord.getId() == null) {
+            throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
+        }
+        return ResponseEntity.ok(leaseService.getPendingApprovalLeasesForLandlord(landlord.getId()));
     }
 
     @GetMapping("/{leaseId}/periods")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
     public ResponseEntity<List<RentPeriod>> getRentPeriods(@PathVariable Long leaseId) {
+        authz.checkCanViewLease(leaseId);
         return ResponseEntity.ok(rentPeriodService.getPeriodsByLeaseId(leaseId));
     }
 
     @PutMapping("/{id}/activate")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'TENANT')")
     public ResponseEntity<LeaseAgreement> activateLease(@PathVariable Long id) {
+        authz.checkCanActivateLease(id);
         return ResponseEntity.ok(leaseService.activateLeaseDirectly(id));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
     public ResponseEntity<LeaseAgreement> getLeaseById(@PathVariable Long id) {
+        authz.checkCanViewLease(id);
         return ResponseEntity.ok(leaseService.getLeaseById(id));
     }
 
-    @PostMapping(value = "/{id}/contract", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/{id}/contract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER')")
     public ResponseEntity<LeaseAgreement> uploadContract(
             @PathVariable Long id,
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(required = false) Long userId) {
+            @RequestParam("file") MultipartFile file) {
+        authz.checkCanUploadContract(id);
+        Long userId = authz.getCurrentUserId();
         return ResponseEntity.ok(leaseService.uploadContract(id, file, userId));
     }
 
     @PutMapping("/{id}/approve")
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('LANDLORD')")
-    public ResponseEntity<LeaseAgreement> approveLease(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long landlordId) {
+    @PreAuthorize("hasRole('LANDLORD')")
+    public ResponseEntity<LeaseAgreement> approveLease(@PathVariable Long id) {
+        authz.checkCanApproveOrRejectLease(id);
+        Long landlordId = authz.getCurrentUserId();
         return ResponseEntity.ok(leaseService.approveLease(id, landlordId));
     }
 
     @PutMapping("/{id}/reject")
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('LANDLORD')")
+    @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<LeaseAgreement> rejectLease(
             @PathVariable Long id,
-            @RequestParam(required = false) Long landlordId,
             @RequestParam(required = false) String reason) {
+        authz.checkCanApproveOrRejectLease(id);
+        Long landlordId = authz.getCurrentUserId();
         return ResponseEntity.ok(leaseService.rejectLease(id, landlordId, reason));
-    }
-
-    @GetMapping("/landlord/{landlordId}/pending-approvals")
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('LANDLORD')")
-    public ResponseEntity<List<LeaseAgreement>> getPendingApprovals(@PathVariable Long landlordId) {
-        return ResponseEntity.ok(leaseService.getPendingApprovalLeasesForLandlord(landlordId));
     }
 }

@@ -1,15 +1,13 @@
 package com.ars.kirazbackend.controller;
 
 import com.ars.kirazbackend.entity.Notification;
+import com.ars.kirazbackend.entity.User;
+import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -19,29 +17,50 @@ import java.util.List;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final AccessControlService authz;
 
+    /**
+     * Kullanıcının okunmamış bildirimlerini döner. Kimlik token'dan alınır.
+     */
     @GetMapping
-    public ResponseEntity<List<Notification>> getUnreadNotifications(@RequestParam Long userId) {
-        return ResponseEntity.ok(notificationService.getUnreadNotifications(userId));
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<Notification>> getUnreadNotifications() {
+        User user = authz.getCurrentUser();
+        if (user == null || user.getId() == null) {
+            throw new RuntimeException("Kullanıcı kimliği belirlenemedi.");
+        }
+        return ResponseEntity.ok(notificationService.getUnreadNotifications(user.getId()));
     }
 
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<Notification>> getUnreadNotificationsByPath(@PathVariable Long userId) {
-        return ResponseEntity.ok(notificationService.getUnreadNotifications(userId));
+    /**
+     * Kullanıcının okunmamış bildirimlerini döner (alternatif açık yol).
+     */
+    @GetMapping("/unread")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<Notification>> getUnreadNotificationsExplicit() {
+        return getUnreadNotifications();
     }
 
-    @GetMapping("/user/{userId}/all")
-    public ResponseEntity<List<Notification>> getAllNotifications(@PathVariable Long userId) {
-        return ResponseEntity.ok(notificationService.getAllNotifications(userId));
+    /**
+     * Kullanıcının tüm bildirim geçmişini döner. Kimlik token'dan alınır.
+     */
+    @GetMapping("/all")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<Notification>> getAllNotifications() {
+        User user = authz.getCurrentUser();
+        if (user == null || user.getId() == null) {
+            throw new RuntimeException("Kullanıcı kimliği belirlenemedi.");
+        }
+        return ResponseEntity.ok(notificationService.getAllNotifications(user.getId()));
     }
 
+    /**
+     * Bildirimi okundu olarak işaretler. Yalnızca bildirimin sahibi işaretleyebilir.
+     */
     @PutMapping("/{id}/read")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Notification> markAsRead(@PathVariable Long id) {
-        return ResponseEntity.ok(notificationService.markAsRead(id));
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<Notification> markAsReadDirect(@PathVariable Long id) {
+        authz.checkCanAccessNotification(id);
         return ResponseEntity.ok(notificationService.markAsRead(id));
     }
 }

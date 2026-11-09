@@ -40,6 +40,12 @@ public class RentPeriodService {
         return checkAndApplyOverdue(periods);
     }
 
+    @Transactional(readOnly = true)
+    public RentPeriod getPeriodById(Long id) {
+        return rentPeriodRepository.findById(id)
+                .orElseThrow(() -> new com.ars.kirazbackend.exception.ResourceNotFoundException("Kira dönemi bulunamadı: " + id));
+    }
+
     @Transactional
     public List<RentPeriod> getPeriodsForLease(Long leaseId) {
         return getPeriodsByLeaseId(leaseId);

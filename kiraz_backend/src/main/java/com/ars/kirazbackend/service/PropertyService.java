@@ -82,4 +82,13 @@ public class PropertyService {
             }
         }
     }
+
+    public Property getPropertyById(Long id) {
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new com.ars.kirazbackend.exception.ResourceNotFoundException("Mülk bulunamadı: " + id));
+        populateTenantInfo(property);
+        return property;
+    }
 }
+
+

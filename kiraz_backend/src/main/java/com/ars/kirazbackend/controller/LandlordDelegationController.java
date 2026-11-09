@@ -4,12 +4,13 @@ import com.ars.kirazbackend.dto.DelegationRequestDto;
 import com.ars.kirazbackend.dto.DelegationResponseDto;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.repository.UserRepository;
+import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.PropertyDelegationService;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +26,7 @@ public class LandlordDelegationController {
 
     private final PropertyDelegationService delegationService;
     private final UserRepository userRepository;
+    private final AccessControlService authz;
 
     @PostMapping
     @PreAuthorize("hasRole('LANDLORD')")
@@ -37,6 +39,14 @@ public class LandlordDelegationController {
                 request != null ? request.managerEmail() : null);
 
         User landlord = resolveLandlord(authentication);
+        if (landlord == null || landlord.getId() == null) {
+            throw new AuthenticationCredentialsNotFoundException("Ev sahibi kimliği belirlenemedi.");
+        }
+
+        if (request != null && request.propertyId() != null) {
+            authz.checkCanAssignDelegation(request.propertyId());
+        }
+
         DelegationResponseDto response = delegationService.assignManager(request, landlord);
         return ResponseEntity.ok(response);
     }
@@ -49,7 +59,7 @@ public class LandlordDelegationController {
         User landlord = resolveLandlord(authentication);
         if (landlord == null || landlord.getId() == null) {
             log.warn("Could not resolve landlord for delegations list");
-            throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
+            throw new AuthenticationCredentialsNotFoundException("Ev sahibi kimliği belirlenemedi.");
         }
 
         log.info("Fetching delegations for landlordId={}", landlord.getId());
@@ -65,8 +75,12 @@ public class LandlordDelegationController {
     ) {
         log.info("Request to revoke delegation id={}", id);
         User landlord = resolveLandlord(authentication);
-        Long landlordId = landlord != null ? landlord.getId() : null;
-        DelegationResponseDto response = delegationService.revokeDelegationDto(id, landlordId);
+        if (landlord == null || landlord.getId() == null) {
+            throw new AuthenticationCredentialsNotFoundException("Ev sahibi kimliği belirlenemedi.");
+        }
+
+        authz.checkCanRevokeDelegation(id);
+        DelegationResponseDto response = delegationService.revokeDelegationDto(id, landlord.getId());
         return ResponseEntity.ok(response);
     }
 

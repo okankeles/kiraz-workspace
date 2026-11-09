@@ -35,7 +35,7 @@ public class LandlordDashboardController {
         Long resolvedLandlordId = resolveLandlordId(authentication);
         if (resolvedLandlordId == null) {
             log.warn("Could not resolve landlord ID from SecurityContext");
-            throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
+            throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Ev sahibi kimliği belirlenemedi.");
         }
 
         log.info("Fetching landlord dashboard for landlordId={}", resolvedLandlordId);

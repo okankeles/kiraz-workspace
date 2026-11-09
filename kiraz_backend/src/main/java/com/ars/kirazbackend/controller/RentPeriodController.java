@@ -1,16 +1,13 @@
 package com.ars.kirazbackend.controller;
 
 import com.ars.kirazbackend.entity.RentPeriod;
+import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.RentPeriodService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -19,33 +16,40 @@ import java.util.List;
 @RequestMapping("/api/periods")
 @RequiredArgsConstructor
 public class RentPeriodController {
+
     private final RentPeriodService rentPeriodService;
+    private final AccessControlService authz;
 
     @GetMapping("/lease/{leaseId}")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
     public ResponseEntity<List<RentPeriod>> getPeriodsByLeaseId(@PathVariable Long leaseId) {
+        authz.checkCanViewLease(leaseId);
         return ResponseEntity.ok(rentPeriodService.getPeriodsByLeaseId(leaseId));
     }
 
-    @PostMapping("/{id}/receipt")
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
+    public ResponseEntity<RentPeriod> getPeriodById(@PathVariable Long id) {
+        authz.checkCanViewPeriod(id);
+        return ResponseEntity.ok(rentPeriodService.getPeriodById(id));
+    }
+
+    @PostMapping(value = "/{id}/receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('TENANT')")
     public ResponseEntity<RentPeriod> uploadReceipt(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
+        authz.checkCanUploadReceipt(id);
         return ResponseEntity.ok(rentPeriodService.uploadReceipt(id, file));
     }
 
-    @PutMapping("/{id}/status")
-    public ResponseEntity<RentPeriod> updateStatus(
-            @PathVariable Long id,
-            @RequestParam("status") String status) {
-        return ResponseEntity.ok(rentPeriodService.updateStatus(id, status));
-    }
-
     @PutMapping("/{id}/legal-process")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LANDLORD', 'AGENT')")
+    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER')")
     public ResponseEntity<RentPeriod> initiateLegalProcess(
             @PathVariable Long id,
-            @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String notes) {
+        authz.checkCanInitiateLegalProcess(id);
+        Long userId = authz.getCurrentUserId();
         return ResponseEntity.ok(rentPeriodService.markAsLegalProcess(id, userId, notes));
     }
 }

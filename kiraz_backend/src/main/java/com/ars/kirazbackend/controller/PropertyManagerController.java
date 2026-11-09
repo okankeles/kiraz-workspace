@@ -36,7 +36,7 @@ public class PropertyManagerController {
         User manager = resolveManager(authentication);
         if (manager == null || manager.getId() == null) {
             log.warn("Could not resolve manager from SecurityContext");
-            throw new RuntimeException("Mülk yöneticisi kimliği belirlenemedi.");
+            throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Mülk yöneticisi kimliği belirlenemedi.");
         }
 
         log.info("Fetching properties for managerId={}", manager.getId());

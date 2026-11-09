@@ -5,12 +5,13 @@ import com.ars.kirazbackend.dto.RejectReceiptRequest;
 import com.ars.kirazbackend.entity.RentPeriod;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.repository.UserRepository;
+import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.LandlordReceiptService;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +27,7 @@ public class LandlordReceiptController {
 
     private final LandlordReceiptService landlordReceiptService;
     private final UserRepository userRepository;
+    private final AccessControlService authz;
 
     @GetMapping("/pending")
     @PreAuthorize("hasRole('LANDLORD')")
@@ -35,7 +37,7 @@ public class LandlordReceiptController {
         User landlord = resolveLandlord(authentication);
         if (landlord == null || landlord.getId() == null) {
             log.warn("Could not resolve landlord from SecurityContext");
-            throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
+            throw new AuthenticationCredentialsNotFoundException("Ev sahibi kimliği belirlenemedi.");
         }
 
         log.info("Fetching pending receipts for landlordId={}", landlord.getId());
@@ -48,6 +50,7 @@ public class LandlordReceiptController {
     public ResponseEntity<RentPeriod> approveReceipt(
             @PathVariable Long periodId
     ) {
+        authz.checkCanReviewReceipt(periodId);
         log.info("Request to approve receipt for periodId={}", periodId);
         RentPeriod approved = landlordReceiptService.approveReceipt(periodId);
         return ResponseEntity.ok(approved);
@@ -60,6 +63,7 @@ public class LandlordReceiptController {
             @RequestBody(required = false) RejectReceiptRequest rejectRequest,
             Authentication authentication
     ) {
+        authz.checkCanReviewReceipt(periodId);
         User landlord = resolveLandlord(authentication);
         String reason = (rejectRequest != null && rejectRequest.reason() != null && !rejectRequest.reason().trim().isEmpty())
                 ? rejectRequest.reason().trim()
