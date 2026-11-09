@@ -71,9 +71,9 @@ class PayTrServiceTest {
     private LeaseAgreement leaseAgreement;
     private RentPeriod rentPeriod;
 
-    private final String merchantId = "659790";
-    private final String merchantKey = "XQTmSzbmBw5YAYzW";
-    private final String merchantSalt = "K5uAP8fQ5htrfKd4";
+    private final String merchantId = "test-merchant-id";
+    private final String merchantKey = "test-merchant-key";
+    private final String merchantSalt = "test-merchant-salt";
 
     @BeforeEach
     void setUp() {
@@ -124,7 +124,7 @@ class PayTrServiceTest {
 
         MultiValueMap<String, String> body = captor.getValue().getBody();
         assertNotNull(body);
-        assertEquals("659790", body.getFirst("merchant_id"));
+        assertEquals("test-merchant-id", body.getFirst("merchant_id"));
         assertEquals("1500000", body.getFirst("payment_amount")); // 15000.00 TL -> 1500000 kuruş
         assertEquals("0", body.getFirst("no_installment")); // Taksit açık
         assertEquals("12", body.getFirst("max_installment")); // Maksimum 12 taksit

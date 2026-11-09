@@ -29,6 +29,12 @@ class AuthServiceAgentRegisterTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private JwtService jwtService;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -36,6 +42,10 @@ class AuthServiceAgentRegisterTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(jwtService.generateAccessToken(any())).thenReturn("mock.jwt.access.token");
+        lenient().when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(900L);
+        lenient().when(refreshTokenService.createRefreshToken(any())).thenReturn("mock_refresh_token");
+
         placeholderAgent = User.builder()
                 .id(10L)
                 .email("placeholder@emlak.com")

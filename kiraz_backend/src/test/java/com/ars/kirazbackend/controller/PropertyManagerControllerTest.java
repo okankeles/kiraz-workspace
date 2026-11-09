@@ -83,18 +83,31 @@ class PropertyManagerControllerTest {
     }
 
     @Test
-    void testGetManagerProperties_WithHeaderUserId_ReturnsOk() throws Exception {
-        SecurityContextHolder.clearContext();
-        when(userRepository.findById(10L)).thenReturn(Optional.of(manager));
+    void testGetManagerProperties_WithTokenAuthHelper_ReturnsOk() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                com.ars.kirazbackend.support.AuthTestHelper.createAuthentication(manager)
+        );
         when(propertyDelegationService.getManagerProperties(10L)).thenReturn(List.of(property));
 
         mockMvc.perform(get("/api/manager/properties")
-                        .header("X-User-Id", "10")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(100L));
 
         verify(propertyDelegationService, times(1)).getManagerProperties(10L);
+    }
+
+    @Test
+    void testGetManagerProperties_WithOnlyHeaderUserId_Fails() throws Exception {
+        SecurityContextHolder.clearContext();
+
+        mockMvc.perform(get("/api/manager/properties")
+                        .header("X-User-Id", "10")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Mülk yöneticisi kimliği belirlenemedi."));
+
+        verifyNoInteractions(propertyDelegationService);
     }
 
     @Test

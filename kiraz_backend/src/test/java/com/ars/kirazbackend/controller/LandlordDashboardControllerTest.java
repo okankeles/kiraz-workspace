@@ -95,12 +95,13 @@ class LandlordDashboardControllerTest {
     }
 
     @Test
-    void testGetDashboard_WithHeaderUserId_ReturnsOk() throws Exception {
-        SecurityContextHolder.clearContext();
+    void testGetDashboard_WithTokenAuthHelper_ReturnsOk() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                com.ars.kirazbackend.support.AuthTestHelper.createAuthentication(landlord)
+        );
         when(landlordDashboardService.getDashboardSummary(1L)).thenReturn(mockResponse);
 
         mockMvc.perform(get("/api/landlord/dashboard")
-                        .header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalMonthlyIncome").value(25000.00));
@@ -109,16 +110,16 @@ class LandlordDashboardControllerTest {
     }
 
     @Test
-    void testGetDashboard_WithQueryParam_ReturnsOk() throws Exception {
+    void testGetDashboard_WithOnlyHeaderUserId_Fails() throws Exception {
         SecurityContextHolder.clearContext();
-        when(landlordDashboardService.getDashboardSummary(5L)).thenReturn(mockResponse);
 
         mockMvc.perform(get("/api/landlord/dashboard")
-                        .param("landlordId", "5")
+                        .header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Ev sahibi kimliği belirlenemedi."));
 
-        verify(landlordDashboardService).getDashboardSummary(5L);
+        verifyNoInteractions(landlordDashboardService);
     }
 
     @Test

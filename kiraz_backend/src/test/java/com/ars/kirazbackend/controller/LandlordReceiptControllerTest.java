@@ -100,18 +100,31 @@ class LandlordReceiptControllerTest {
     }
 
     @Test
-    void testGetPendingReceipts_WithHeaderUserId_ReturnsOk() throws Exception {
-        SecurityContextHolder.clearContext();
-        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(landlord));
+    void testGetPendingReceipts_WithTokenAuthHelper_ReturnsOk() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                com.ars.kirazbackend.support.AuthTestHelper.createAuthentication(landlord)
+        );
         when(landlordReceiptService.getPendingReceipts(1L)).thenReturn(List.of(sampleDto));
 
         mockMvc.perform(get("/api/landlord/receipts/pending")
-                        .header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].periodId").value(100L));
 
         verify(landlordReceiptService, times(1)).getPendingReceipts(1L);
+    }
+
+    @Test
+    void testGetPendingReceipts_WithOnlyHeaderUserId_Fails() throws Exception {
+        SecurityContextHolder.clearContext();
+
+        mockMvc.perform(get("/api/landlord/receipts/pending")
+                        .header("X-User-Id", "1")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Ev sahibi kimliği belirlenemedi."));
+
+        verifyNoInteractions(landlordReceiptService);
     }
 
     @Test
