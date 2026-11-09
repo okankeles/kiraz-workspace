@@ -30,13 +30,11 @@ public class LandlordReceiptController {
     @GetMapping("/pending")
     @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<List<PendingReceiptDto>> getPendingReceipts(
-            HttpServletRequest request,
-            Authentication authentication,
-            @RequestParam(required = false) Long landlordId
+            Authentication authentication
     ) {
-        User landlord = resolveLandlord(request, authentication, landlordId);
+        User landlord = resolveLandlord(authentication);
         if (landlord == null || landlord.getId() == null) {
-            log.warn("Could not resolve landlord from SecurityContext or request");
+            log.warn("Could not resolve landlord from SecurityContext");
             throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
         }
 
@@ -60,10 +58,9 @@ public class LandlordReceiptController {
     public ResponseEntity<RentPeriod> rejectReceipt(
             @PathVariable Long periodId,
             @RequestBody(required = false) RejectReceiptRequest rejectRequest,
-            HttpServletRequest request,
             Authentication authentication
     ) {
-        User landlord = resolveLandlord(request, authentication, null);
+        User landlord = resolveLandlord(authentication);
         String reason = (rejectRequest != null && rejectRequest.reason() != null && !rejectRequest.reason().trim().isEmpty())
                 ? rejectRequest.reason().trim()
                 : "Ev sahibi tarafından reddedildi.";
@@ -73,7 +70,7 @@ public class LandlordReceiptController {
         return ResponseEntity.ok(rejected);
     }
 
-    private User resolveLandlord(HttpServletRequest request, Authentication auth, Long paramLandlordId) {
+    private User resolveLandlord(Authentication auth) {
         if (auth == null) {
             auth = SecurityContextHolder.getContext().getAuthentication();
         }
@@ -87,22 +84,6 @@ public class LandlordReceiptController {
                     return userOpt.get();
                 }
             }
-        }
-
-        if (paramLandlordId != null) {
-            return userRepository.findById(paramLandlordId).orElse(null);
-        }
-
-        String headerId = request.getHeader("X-User-Id");
-        if (headerId != null && !headerId.trim().isEmpty()) {
-            try {
-                return userRepository.findById(Long.parseLong(headerId.trim())).orElse(null);
-            } catch (NumberFormatException ignored) {}
-        }
-
-        String headerEmail = request.getHeader("X-User-Email");
-        if (headerEmail != null && !headerEmail.trim().isEmpty()) {
-            return userRepository.findByEmail(headerEmail.trim()).orElse(null);
         }
 
         return null;

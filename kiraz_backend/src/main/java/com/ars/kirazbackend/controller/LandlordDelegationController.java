@@ -30,14 +30,13 @@ public class LandlordDelegationController {
     @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<DelegationResponseDto> assignManager(
             @RequestBody DelegationRequestDto request,
-            HttpServletRequest httpRequest,
             Authentication authentication
     ) {
         log.info("Request to assign manager for propertyId={}, managerEmail={}",
                 request != null ? request.propertyId() : null,
                 request != null ? request.managerEmail() : null);
 
-        User landlord = resolveLandlord(httpRequest, authentication, null);
+        User landlord = resolveLandlord(authentication);
         DelegationResponseDto response = delegationService.assignManager(request, landlord);
         return ResponseEntity.ok(response);
     }
@@ -45,11 +44,9 @@ public class LandlordDelegationController {
     @GetMapping
     @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<List<DelegationResponseDto>> getLandlordDelegations(
-            @RequestParam(required = false) Long landlordId,
-            HttpServletRequest httpRequest,
             Authentication authentication
     ) {
-        User landlord = resolveLandlord(httpRequest, authentication, landlordId);
+        User landlord = resolveLandlord(authentication);
         if (landlord == null || landlord.getId() == null) {
             log.warn("Could not resolve landlord for delegations list");
             throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
@@ -64,17 +61,16 @@ public class LandlordDelegationController {
     @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<DelegationResponseDto> revokeDelegation(
             @PathVariable Long id,
-            HttpServletRequest httpRequest,
             Authentication authentication
     ) {
         log.info("Request to revoke delegation id={}", id);
-        User landlord = resolveLandlord(httpRequest, authentication, null);
+        User landlord = resolveLandlord(authentication);
         Long landlordId = landlord != null ? landlord.getId() : null;
         DelegationResponseDto response = delegationService.revokeDelegationDto(id, landlordId);
         return ResponseEntity.ok(response);
     }
 
-    private User resolveLandlord(HttpServletRequest request, Authentication auth, Long paramLandlordId) {
+    private User resolveLandlord(Authentication auth) {
         if (auth == null) {
             auth = SecurityContextHolder.getContext().getAuthentication();
         }
@@ -88,22 +84,6 @@ public class LandlordDelegationController {
                     return userOpt.get();
                 }
             }
-        }
-
-        if (paramLandlordId != null) {
-            return userRepository.findById(paramLandlordId).orElse(null);
-        }
-
-        String headerId = request.getHeader("X-User-Id");
-        if (headerId != null && !headerId.trim().isEmpty()) {
-            try {
-                return userRepository.findById(Long.parseLong(headerId.trim())).orElse(null);
-            } catch (NumberFormatException ignored) {}
-        }
-
-        String headerEmail = request.getHeader("X-User-Email");
-        if (headerEmail != null && !headerEmail.trim().isEmpty()) {
-            return userRepository.findByEmail(headerEmail.trim()).orElse(null);
         }
 
         return null;

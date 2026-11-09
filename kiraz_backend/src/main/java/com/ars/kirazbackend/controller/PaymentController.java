@@ -61,7 +61,7 @@ public class PaymentController {
      * PayTR ile anlaşma gereği bu endpoint x-www-form-urlencoded formatında veri tüketir
      * ve sadece "OK" düz metin yanıtı döner.
      */
-    @PostMapping(value = "/paytr-callback", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
+    @PostMapping(value = {"/paytr-callback", "/paytr/callback"}, consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> payTrCallback(@RequestParam MultiValueMap<String, String> payload) {
         log.info("PayTR Callback webhook isteği alındı: oid={}", payload.getFirst("merchant_oid"));
         String response = payTrService.processCallback(payload);

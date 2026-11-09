@@ -30,13 +30,11 @@ public class LandlordDashboardController {
     @GetMapping
     @PreAuthorize("hasRole('LANDLORD')")
     public ResponseEntity<LandlordDashboardResponse> getDashboard(
-            HttpServletRequest request,
-            Authentication authentication,
-            @RequestParam(required = false) Long landlordId
+            Authentication authentication
     ) {
-        Long resolvedLandlordId = resolveLandlordId(request, authentication, landlordId);
+        Long resolvedLandlordId = resolveLandlordId(authentication);
         if (resolvedLandlordId == null) {
-            log.warn("Could not resolve landlord ID from SecurityContext or request");
+            log.warn("Could not resolve landlord ID from SecurityContext");
             throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
         }
 
@@ -45,7 +43,7 @@ public class LandlordDashboardController {
         return ResponseEntity.ok(response);
     }
 
-    private Long resolveLandlordId(HttpServletRequest request, Authentication auth, Long paramLandlordId) {
+    private Long resolveLandlordId(Authentication auth) {
         if (auth == null) {
             auth = SecurityContextHolder.getContext().getAuthentication();
         }
@@ -58,25 +56,6 @@ public class LandlordDashboardController {
                 if (userOpt.isPresent()) {
                     return userOpt.get().getId();
                 }
-            }
-        }
-
-        if (paramLandlordId != null) {
-            return paramLandlordId;
-        }
-
-        String headerId = request.getHeader("X-User-Id");
-        if (headerId != null && !headerId.trim().isEmpty()) {
-            try {
-                return Long.parseLong(headerId.trim());
-            } catch (NumberFormatException ignored) {}
-        }
-
-        String headerEmail = request.getHeader("X-User-Email");
-        if (headerEmail != null && !headerEmail.trim().isEmpty()) {
-            Optional<User> userOpt = userRepository.findByEmail(headerEmail.trim());
-            if (userOpt.isPresent()) {
-                return userOpt.get().getId();
             }
         }
 

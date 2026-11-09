@@ -31,13 +31,11 @@ public class PropertyManagerController {
     @GetMapping("/properties")
     @PreAuthorize("hasRole('PROPERTY_MANAGER')")
     public ResponseEntity<List<Property>> getManagerProperties(
-            @RequestParam(required = false) Long managerId,
-            HttpServletRequest httpRequest,
             Authentication authentication
     ) {
-        User manager = resolveManager(httpRequest, authentication, managerId);
+        User manager = resolveManager(authentication);
         if (manager == null || manager.getId() == null) {
-            log.warn("Could not resolve manager from SecurityContext or request");
+            log.warn("Could not resolve manager from SecurityContext");
             throw new RuntimeException("Mülk yöneticisi kimliği belirlenemedi.");
         }
 
@@ -46,7 +44,7 @@ public class PropertyManagerController {
         return ResponseEntity.ok(properties);
     }
 
-    private User resolveManager(HttpServletRequest request, Authentication auth, Long paramManagerId) {
+    private User resolveManager(Authentication auth) {
         if (auth == null) {
             auth = SecurityContextHolder.getContext().getAuthentication();
         }
@@ -60,22 +58,6 @@ public class PropertyManagerController {
                     return userOpt.get();
                 }
             }
-        }
-
-        if (paramManagerId != null) {
-            return userRepository.findById(paramManagerId).orElse(null);
-        }
-
-        String headerId = request.getHeader("X-User-Id");
-        if (headerId != null && !headerId.trim().isEmpty()) {
-            try {
-                return userRepository.findById(Long.parseLong(headerId.trim())).orElse(null);
-            } catch (NumberFormatException ignored) {}
-        }
-
-        String headerEmail = request.getHeader("X-User-Email");
-        if (headerEmail != null && !headerEmail.trim().isEmpty()) {
-            return userRepository.findByEmail(headerEmail.trim()).orElse(null);
         }
 
         return null;
