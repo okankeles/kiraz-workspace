@@ -41,6 +41,9 @@ class LandlordDelegationControllerTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.ars.kirazbackend.service.AccessControlService authz;
+
     @InjectMocks
     private LandlordDelegationController controller;
 
@@ -119,7 +122,8 @@ class LandlordDelegationControllerTest {
 
         mockMvc.perform(get("/api/landlord/delegations")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Ev sahibi kimliği belirlenemedi."));
     }
 

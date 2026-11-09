@@ -116,19 +116,21 @@ class LandlordDashboardControllerTest {
         mockMvc.perform(get("/api/landlord/dashboard")
                         .header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Ev sahibi kimliği belirlenemedi."));
 
         verifyNoInteractions(landlordDashboardService);
     }
 
     @Test
-    void testGetDashboard_WithoutUser_ReturnsBadRequest() throws Exception {
+    void testGetDashboard_WithoutUser_ReturnsUnauthorized() throws Exception {
         SecurityContextHolder.clearContext();
 
         mockMvc.perform(get("/api/landlord/dashboard")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Ev sahibi kimliği belirlenemedi."));
     }
 }

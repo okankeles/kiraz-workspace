@@ -50,6 +50,9 @@ class PaymentControllerTest {
     @Mock
     private RentPeriodService rentPeriodService;
 
+    @Mock
+    private com.ars.kirazbackend.service.AccessControlService authz;
+
     @InjectMocks
     private PaymentController paymentController;
 
@@ -69,6 +72,7 @@ class PaymentControllerTest {
                 tenantUser, null, List.of(new SimpleGrantedAuthority("ROLE_TENANT"))
         );
         SecurityContextHolder.getContext().setAuthentication(auth);
+        org.mockito.Mockito.lenient().when(authz.getCurrentUser()).thenReturn(tenantUser);
     }
 
     @Test

@@ -45,6 +45,9 @@ class LandlordReceiptControllerTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.ars.kirazbackend.service.AccessControlService authz;
+
     @InjectMocks
     private LandlordReceiptController landlordReceiptController;
 
@@ -121,7 +124,8 @@ class LandlordReceiptControllerTest {
         mockMvc.perform(get("/api/landlord/receipts/pending")
                         .header("X-User-Id", "1")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Ev sahibi kimliği belirlenemedi."));
 
         verifyNoInteractions(landlordReceiptService);
@@ -133,7 +137,8 @@ class LandlordReceiptControllerTest {
 
         mockMvc.perform(get("/api/landlord/receipts/pending")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Ev sahibi kimliği belirlenemedi."));
     }
 

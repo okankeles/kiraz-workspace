@@ -167,6 +167,22 @@ public class JwtAuthenticationIntegrationTest {
     }
 
     @Test
+    void testAuthEndpoints_LoginFailure_ReturnsStandard401ErrorBody() throws Exception {
+        LoginRequest badLoginReq = LoginRequest.builder()
+                .email(testLandlord.getEmail())
+                .password("WrongPassword123!")
+                .build();
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(badLoginReq)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.message").value("E-posta veya şifre hatalı"));
+    }
+
+    @Test
     void testRefreshToken_Rotation_AndReuseDetection() throws Exception {
         // 1. Login to get initial tokens
         LoginRequest loginReq = LoginRequest.builder()
@@ -255,7 +271,7 @@ public class JwtAuthenticationIntegrationTest {
         form.add("hash", "BAD_HASH");
 
         // It should reject with bad hash or fail gracefully, but NEVER return 401 Unauthorized for lack of JWT!
-        mockMvc.perform(post("/api/payments/paytr/callback")
+        mockMvc.perform(post("/api/payments/paytr-callback")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .params(form))
                 .andExpect(status().isBadRequest()); // Bad hash triggers exception handled by GlobalExceptionHandler -> 400, NOT 401!

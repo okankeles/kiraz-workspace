@@ -104,7 +104,8 @@ class PropertyManagerControllerTest {
         mockMvc.perform(get("/api/manager/properties")
                         .header("X-User-Id", "10")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Mülk yöneticisi kimliği belirlenemedi."));
 
         verifyNoInteractions(propertyDelegationService);
@@ -116,7 +117,8 @@ class PropertyManagerControllerTest {
 
         mockMvc.perform(get("/api/manager/properties")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Mülk yöneticisi kimliği belirlenemedi."));
     }
 }
