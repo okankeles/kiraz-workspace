@@ -2,12 +2,17 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: kiraz_db
+    env_file:
+      - path: ../.env
+        required: false
+      - path: .env
+        required: false
     environment:
-      POSTGRES_USER: ars_admin
-      POSTGRES_PASSWORD: ars_password_2026
-      POSTGRES_DB: kiraz_db
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-kiraz_db}
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
