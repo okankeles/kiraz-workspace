@@ -1,8 +1,6 @@
 package com.ars.kirazbackend.service;
 
-import com.ars.kirazbackend.dto.AuthResponse;
-import com.ars.kirazbackend.dto.LoginRequest;
-import com.ars.kirazbackend.dto.RegisterRequest;
+import com.ars.kirazbackend.dto.*;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.enums.RoleType;
 import com.ars.kirazbackend.repository.UserRepository;
@@ -22,6 +20,8 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -49,14 +49,7 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
-        return AuthResponse.builder()
-            .id(savedUser.getId())
-            .fullName(savedUser.getFullName())
-            .email(savedUser.getEmail())
-            .role(savedUser.getRole())
-            .referenceCode(savedUser.getReferenceCode())
-            .message("User registered successfully")
-            .build();
+        return buildAuthResponse(savedUser, "User registered successfully");
     }
 
     private AuthResponse registerAgent(RegisterRequest request) {
@@ -97,14 +90,7 @@ public class AuthService {
             log.info("Emlakçı davet koduyla başarıyla kaydedildi ve aktifleştirildi: id={}, email={}, refCode={}",
                     savedUser.getId(), savedUser.getEmail(), savedUser.getReferenceCode());
 
-            return AuthResponse.builder()
-                    .id(savedUser.getId())
-                    .fullName(savedUser.getFullName())
-                    .email(savedUser.getEmail())
-                    .role(savedUser.getRole())
-                    .referenceCode(savedUser.getReferenceCode())
-                    .message("Emlakçı kaydı başarıyla tamamlandı ve hesap aktifleştirildi")
-                    .build();
+            return buildAuthResponse(savedUser, "Emlakçı kaydı başarıyla tamamlandı ve hesap aktifleştirildi");
         } else {
             // Referans kodu verilmemişse:
             String requestEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
@@ -131,32 +117,82 @@ public class AuthService {
 
             User savedUser = userRepository.save(user);
 
-            return AuthResponse.builder()
-                    .id(savedUser.getId())
-                    .fullName(savedUser.getFullName())
-                    .email(savedUser.getEmail())
-                    .role(savedUser.getRole())
-                    .referenceCode(savedUser.getReferenceCode())
-                    .message("Emlakçı kaydı başarıyla tamamlandı")
-                    .build();
+            return buildAuthResponse(savedUser, "Emlakçı kaydı başarıyla tamamlandı");
         }
     }
 
+    @Transactional
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(request.getEmail().trim())
                 .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new RuntimeException("Invalid credentials");
         }
 
+        return buildAuthResponse(user, "Login successful");
+    }
+
+    public AuthResponse refresh(RefreshTokenRequest request) {
+        RefreshTokenService.RefreshTokenValidationResult result =
+                refreshTokenService.rotateRefreshToken(request.getRefreshToken());
+
+        User user = result.user();
+        String newAccessToken = jwtService.generateAccessToken(user);
+        String newRefreshToken = result.newRefreshToken();
+        long expiresIn = jwtService.getAccessTokenExpirationSeconds();
+
+        UserSummaryDto userSummary = UserSummaryDto.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .build();
+
         return AuthResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .expiresIn(expiresIn)
+                .user(userSummary)
                 .id(user.getId())
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .role(user.getRole())
                 .referenceCode(user.getReferenceCode())
-                .message("Login successful")
+                .message("Token refreshed successfully")
+                .build();
+    }
+
+    @Transactional
+    public void logout(LogoutRequest request) {
+        if (request != null && request.getRefreshToken() != null) {
+            refreshTokenService.revokeRefreshToken(request.getRefreshToken());
+        }
+    }
+
+    private AuthResponse buildAuthResponse(User user, String message) {
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = refreshTokenService.createRefreshToken(user);
+        long expiresIn = jwtService.getAccessTokenExpirationSeconds();
+
+        UserSummaryDto userSummary = UserSummaryDto.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .build();
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .expiresIn(expiresIn)
+                .user(userSummary)
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .referenceCode(user.getReferenceCode())
+                .message(message)
                 .build();
     }
 }

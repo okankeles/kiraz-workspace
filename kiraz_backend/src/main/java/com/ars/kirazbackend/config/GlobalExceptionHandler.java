@@ -18,10 +18,16 @@ public class GlobalExceptionHandler {
                 .body(Map.of("message", "Yetkisiz erişim: Bu işlem için gerekli yetkiye sahip değilsiniz."));
     }
 
-    @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<Map<String, String>> handleAuthenticationException(AuthenticationException ex) {
+    @ExceptionHandler(com.ars.kirazbackend.exception.InvalidRefreshTokenException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidRefreshTokenException(com.ars.kirazbackend.exception.InvalidRefreshTokenException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("message", "Kimlik doğrulama başarısız. Lütfen giriş yapın."));
+                .body(Map.of("status", 401, "error", "Unauthorized", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthenticationException(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("status", 401, "error", "Unauthorized", "message", "Kimlik doğrulama başarısız. Lütfen giriş yapın."));
     }
 
     @ExceptionHandler(RuntimeException.class)

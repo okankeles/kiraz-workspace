@@ -19,6 +19,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final UserAuthenticationFilter userAuthenticationFilter;
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -28,23 +29,17 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.disable()) // Postman ve yerel testler için CORS'u devre dışı bırak
+            .cors(cors -> cors.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(customAuthenticationEntryPoint))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/api/auth/**",
-                    "/api/properties/**",
-                    "/api/leases/**",
-                    "/api/periods/**",
-                    "/api/delegations/**",
-                    "/api/audit-logs/**",
-                    "/api/dashboard/**",
-                    "/api/landlord/**",
-                    "/api/manager/**",
-                    "/api/notifications/**",
-                    "/api/payments/**",
-                    "/uploads/**",
-                    "/api/uploads/**",
+                    "/api/payments/paytr/callback",
+                    "/api/payments/paytr-callback",
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
                     "/error"
                 ).permitAll()
                 .anyRequest().authenticated()
