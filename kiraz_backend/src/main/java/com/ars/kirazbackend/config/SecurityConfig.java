@@ -35,7 +35,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/api/auth/**",
-                    "/api/payments/paytr/callback",
+                    "/api/leases/accept",
+                    "/api/leases/validate-invite",
                     "/api/payments/paytr-callback",
                     "/v3/api-docs/**",
                     "/swagger-ui/**",

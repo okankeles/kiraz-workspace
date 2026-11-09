@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("dev")
+@ConditionalOnProperty(name = "kiraz.dev.smtp-verify", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class DevSmtpVerifier implements CommandLineRunner {
 
@@ -26,7 +28,7 @@ public class DevSmtpVerifier implements CommandLineRunner {
             log.warn("SMTP_TEST_RESULT: FAILED: smtpUsername is not configured");
             return;
         }
-        log.info("Dev profile active: sending SMTP verification test email to configured address");
+        log.info("Dev profile active with kiraz.dev.smtp-verify=true: sending SMTP verification test email to configured address");
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(smtpUsername.trim());

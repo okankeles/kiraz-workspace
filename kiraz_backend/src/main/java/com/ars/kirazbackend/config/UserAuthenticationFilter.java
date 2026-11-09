@@ -39,7 +39,8 @@ public class UserAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
         return path.startsWith("/api/auth/") ||
-                path.startsWith("/api/payments/paytr/callback") ||
+                path.equals("/api/leases/accept") ||
+                path.equals("/api/leases/validate-invite") ||
                 path.startsWith("/api/payments/paytr-callback") ||
                 path.startsWith("/v3/api-docs") ||
                 path.startsWith("/swagger-ui") ||

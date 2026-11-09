@@ -69,3 +69,8 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+kiraz:
+  dev:
+    smtp-verify: false
+
