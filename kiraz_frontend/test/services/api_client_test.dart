@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -47,6 +48,22 @@ class InMemoryTokenStorage extends TokenStorage {
   @override
   Future<bool> hasAccessToken() async =>
       _accessToken != null && _accessToken!.isNotEmpty;
+}
+
+class PlatformExceptionThrowingTokenStorage extends TokenStorage {
+  @override
+  Future<void> clearTokens() async {
+    throw PlatformException(
+      code: '-34018',
+      message: "A required entitlement isn't present.",
+    );
+  }
+
+  @override
+  Future<String?> getAccessToken() async => null;
+
+  @override
+  Future<String?> getRefreshToken() async => null;
 }
 
 void main() {
@@ -264,6 +281,60 @@ void main() {
       expect(endpointCallCount, 6);
       expect(await tokenStorage.getAccessToken(), 'fresh-rotated-access-token');
       expect(await tokenStorage.getRefreshToken(), 'fresh-rotated-refresh-token');
+    });
+
+    test('5. TokenStorage PlatformException fırlatsa bile handleSessionExpired exception fırlatmadan onSessionExpired tetikler', () async {
+      final tokenStorage = PlatformExceptionThrowingTokenStorage();
+      bool sessionExpiredCalled = false;
+
+      final apiClient = ApiClient(
+        tokenStorage: tokenStorage,
+        baseUrl: baseUrl,
+        onSessionExpired: () {
+          sessionExpiredCalled = true;
+        },
+      );
+
+      // handleSessionExpired doğrudan çağrıldığında exception fırlatmamalı ve onSessionExpired'ı çağırmalı
+      await expectLater(
+        () => apiClient.handleSessionExpired(),
+        returnsNormally,
+      );
+
+      expect(sessionExpiredCalled, isTrue);
+    });
+
+    test('6. 401 ve başarısız refresh sırasında TokenStorage.clearTokens PlatformException fırlatsa bile onSessionExpired tetiklenir ve istemci çökmez', () async {
+      final tokenStorage = PlatformExceptionThrowingTokenStorage();
+      bool sessionExpiredCalled = false;
+
+      final mockHttpClient = MockClient((request) async {
+        return http.Response(
+          json.encode({'status': 401, 'message': 'Unauthorized'}),
+          401,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final apiClient = ApiClient(
+        httpClient: mockHttpClient,
+        tokenStorage: tokenStorage,
+        baseUrl: baseUrl,
+        onSessionExpired: () {
+          sessionExpiredCalled = true;
+        },
+      );
+
+      final uri = apiClient.resolveUri('/landlord/properties');
+
+      // İstek 401 alır, refresh başarısız olur ve session expired işlenir
+      // PlatformException yutulmalı, yalnızca standart ApiException(401) fırlatılmalı
+      await expectLater(
+        () => apiClient.get(uri),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)),
+      );
+
+      expect(sessionExpiredCalled, isTrue);
     });
   });
 }
