@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../models/lease.dart';
+import '../models/regenerate_invite_response.dart';
 import 'api_client.dart';
 
 class LeaseService {
@@ -192,7 +193,7 @@ class LeaseService {
   }
 
   /// Sözleşme belgesi yükler.
-  /// POST /api/leases/{id}/upload-contract (Multipart, alan adı "file")
+  /// POST /api/leases/{id}/contract (Multipart, alan adı "file")
   Future<void> uploadContract(int leaseId, File file) async {
     final bytes = await file.readAsBytes();
 
@@ -221,7 +222,7 @@ class LeaseService {
       );
     }
 
-    final uri = _apiClient.resolveUri('/leases/$leaseId/upload-contract');
+    final uri = _apiClient.resolveUri('/leases/$leaseId/contract');
 
     await _apiClient.sendMultipart(() async {
       final request = http.MultipartRequest('POST', uri);
@@ -234,5 +235,31 @@ class LeaseService {
       request.files.add(multipartFile);
       return request;
     });
+  }
+
+  /// Sözleşme için yeni davet kodu üretir ve eskisini geçersiz kılar (Yalnızca LANDLORD).
+  /// POST /api/landlord/leases/{id}/regenerate-invite
+  Future<RegenerateInviteResponse> regenerateInviteCode(int leaseId) async {
+    final uri = _apiClient.resolveUri('/landlord/leases/$leaseId/regenerate-invite');
+    try {
+      final response = await _apiClient.post(uri);
+      final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+      return RegenerateInviteResponse.fromJson(data as Map<String, dynamic>);
+    } catch (e) {
+      if (e is ApiException) {
+        if (e.statusCode == 409) {
+          throw ApiException(
+            statusCode: 409,
+            message: 'Kiracı zaten bağlanmış veya sözleşme artık aktif değil. Yeni davet kodu üretilemez.',
+          );
+        } else if (e.statusCode == 404) {
+          throw ApiException(
+            statusCode: 404,
+            message: 'Sözleşme bulunamadı veya bu işlem için yetkiniz yok.',
+          );
+        }
+      }
+      rethrow;
+    }
   }
 }

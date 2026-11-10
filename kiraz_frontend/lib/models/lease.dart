@@ -21,6 +21,8 @@ class Lease {
   final String? landlordEmail;
   final String? endDate;
   final bool? landlordApproved;
+  final DateTime? inviteCodeExpiresAt;
+  final bool? inviteCodeUsed;
 
   Lease({
     required this.id,
@@ -45,7 +47,23 @@ class Lease {
     this.landlordEmail,
     this.endDate,
     this.landlordApproved,
+    this.inviteCodeExpiresAt,
+    this.inviteCodeUsed,
   });
+
+  bool get isInviteExpired {
+    if (inviteCodeExpiresAt == null) return false;
+    return DateTime.now().isAfter(inviteCodeExpiresAt!);
+  }
+
+  bool get canRegenerateInvite {
+    if (inviteCodeUsed == true) return false;
+    final s = status?.toUpperCase();
+    if (s == 'ACTIVE' || s == 'CANCELLED') return false;
+    final a = approvalStatus?.toUpperCase();
+    if (a == 'REJECTED' || a == 'TERMINATED') return false;
+    return true;
+  }
 
   bool get isPendingLandlordApproval =>
       approvalStatus?.toUpperCase() == 'PENDING_LANDLORD_APPROVAL' ||
@@ -136,6 +154,21 @@ class Lease {
 
     final rawApprovalStatus = json['approvalStatus'] ?? json['approvalStatusName'];
 
+    DateTime? parsedExpiry;
+    if (json['inviteCodeExpiresAt'] != null) {
+      try {
+        parsedExpiry = DateTime.parse(json['inviteCodeExpiresAt'].toString());
+      } catch (_) {}
+    }
+
+    bool? parsedUsed;
+    if (json['inviteCodeUsed'] is bool) {
+      parsedUsed = json['inviteCodeUsed'] as bool;
+    } else if (json['inviteCodeUsed'] != null) {
+      final s = json['inviteCodeUsed'].toString().toLowerCase();
+      parsedUsed = s == 'true';
+    }
+
     return Lease(
       id: parseId(json['id']),
       propertyId: parseId(json['propertyId'], json['property']),
@@ -167,6 +200,8 @@ class Lease {
               : (json['approvalStatus'] == 'APPROVED' || json['approvalStatus'] == 'ACTIVE'
                   ? true
                   : null)),
+      inviteCodeExpiresAt: parsedExpiry,
+      inviteCodeUsed: parsedUsed,
     );
   }
 }

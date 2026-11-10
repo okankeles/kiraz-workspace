@@ -65,8 +65,8 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
 
       String errorMessage;
       if (e is ApiException) {
-        if (e.statusCode == 400) {
-          errorMessage = 'Davet kodu geçersiz, süresi dolmuş veya daha önce kullanılmış.';
+        if (e.statusCode == 400 || e.statusCode == 404) {
+          errorMessage = 'Kod geçersiz veya süresi dolmuş.';
         } else if (e.statusCode == 429) {
           errorMessage = 'Çok fazla deneme yapıldı. Lütfen bir dakika sonra tekrar deneyiniz.';
         } else {
