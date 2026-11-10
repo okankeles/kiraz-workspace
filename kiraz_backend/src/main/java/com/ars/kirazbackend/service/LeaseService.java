@@ -17,18 +17,25 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ars.kirazbackend.enums.LeaseApprovalStatus;
+import com.ars.kirazbackend.exception.ConflictException;
+import com.ars.kirazbackend.exception.ResourceNotFoundException;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
-
-import com.ars.kirazbackend.enums.LeaseApprovalStatus;
-import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 public class LeaseService {
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final LeaseAgreementRepository leaseRepository;
     private final PropertyRepository propertyRepository;
     private final UserRepository userRepository;
@@ -98,7 +105,8 @@ public class LeaseService {
         }
 
         Integer paymentDay = request.getPaymentDay() != null ? request.getPaymentDay() : start.getDayOfMonth();
-        String inviteCode = "ARS-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        String inviteCode = generateInviteCode();
+        LocalDateTime inviteCodeExpiresAt = LocalDateTime.now().plusDays(7);
 
         // Maker-Checker: Determine creator and approval status
         Long creatorId = request.getAgentId() != null ? request.getAgentId() : request.getCreatedById();
@@ -138,6 +146,8 @@ public class LeaseService {
                 .approvalStatus(approvalStatus)
                 .createdBy(creator)
                 .inviteCode(inviteCode)
+                .inviteCodeExpiresAt(inviteCodeExpiresAt)
+                .inviteCodeUsed(false)
                 .contractFileUrl(request.getContractFileUrl())
                 .build();
         LeaseAgreement savedLease = leaseRepository.save(lease);
@@ -196,10 +206,22 @@ public class LeaseService {
         return savedLease;
     }
 
+    public static String generateInviteCode() {
+        byte[] bytes = new byte[16];
+        SECURE_RANDOM.nextBytes(bytes);
+        return "ARS-" + HexFormat.of().formatHex(bytes).toUpperCase();
+    }
+
     @Transactional
     public LeaseAgreement acceptLease(String inviteCode, String newPassword) {
-        LeaseAgreement lease = leaseRepository.findByInviteCode(inviteCode)
-                .orElseThrow(() -> new RuntimeException("Geçersiz davet kodu"));
+        LeaseAgreement lease = findByInviteCode(inviteCode);
+
+        if (Boolean.TRUE.equals(lease.getInviteCodeUsed())) {
+            throw new IllegalArgumentException("Davet kodu daha önce kullanılmış.");
+        }
+        if (lease.getInviteCodeExpiresAt() != null && LocalDateTime.now().isAfter(lease.getInviteCodeExpiresAt())) {
+            throw new IllegalArgumentException("Davet kodunun süresi dolmuş.");
+        }
 
         User tenant = lease.getTenant();
         if (tenant != null && newPassword != null && !newPassword.trim().isEmpty()) {
@@ -207,6 +229,8 @@ public class LeaseService {
             userRepository.save(tenant);
         }
 
+        lease.setInviteCodeUsed(true);
+        lease.setInviteCodeUsedAt(LocalDateTime.now());
         return leaseRepository.save(lease);
     }
 
@@ -225,7 +249,18 @@ public class LeaseService {
     @Transactional
     public LeaseAgreement activateLeaseDirectly(Long leaseId) {
         LeaseAgreement lease = leaseRepository.findById(leaseId)
-                .orElseThrow(() -> new RuntimeException("Lease not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Sözleşme bulunamadı: " + leaseId));
+
+        if (lease.getApprovalStatus() == LeaseApprovalStatus.PENDING_LANDLORD_APPROVAL) {
+            throw new ConflictException("Ev sahibi onayı olmadan sözleşme aktif edilemez.");
+        }
+        if (lease.getApprovalStatus() == LeaseApprovalStatus.REJECTED || lease.getApprovalStatus() == LeaseApprovalStatus.TERMINATED) {
+            throw new ConflictException("Reddedilmiş veya feshedilmiş bir sözleşme aktif edilemez.");
+        }
+        if (lease.getApprovalStatus() != null && lease.getApprovalStatus() != LeaseApprovalStatus.ACTIVE) {
+            throw new ConflictException("Ev sahibi onayı olmadan sözleşme aktif edilemez.");
+        }
+
         lease.setStatus(LeaseStatus.ACTIVE);
         LeaseAgreement savedLease = leaseRepository.save(lease);
 
@@ -244,11 +279,19 @@ public class LeaseService {
 
     public LeaseAgreement findByInviteCode(String inviteCode) {
         return leaseRepository.findByInviteCode(inviteCode)
-                .orElseThrow(() -> new RuntimeException("Geçersiz davet kodu"));
+                .orElseThrow(() -> new ResourceNotFoundException("Geçersiz davet kodu"));
     }
 
     public com.ars.kirazbackend.dto.InviteValidationResponse validateInvite(String inviteCode) {
         LeaseAgreement lease = findByInviteCode(inviteCode);
+
+        if (Boolean.TRUE.equals(lease.getInviteCodeUsed())) {
+            throw new IllegalArgumentException("Davet kodu daha önce kullanılmış.");
+        }
+        if (lease.getInviteCodeExpiresAt() != null && LocalDateTime.now().isAfter(lease.getInviteCodeExpiresAt())) {
+            throw new IllegalArgumentException("Davet kodunun süresi dolmuş.");
+        }
+
         String email = lease.getTenant() != null ? lease.getTenant().getEmail() : null;
         String name = lease.getTenant() != null ? lease.getTenant().getFullName() : null;
         String status = lease.getStatus() != null ? lease.getStatus().name() : null;
@@ -264,7 +307,7 @@ public class LeaseService {
 
     public LeaseAgreement getLeaseById(Long id) {
         return leaseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Sözleşme bulunamadı: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Sözleşme bulunamadı: " + id));
     }
 
     @Transactional
@@ -275,7 +318,7 @@ public class LeaseService {
     @Transactional
     public LeaseAgreement uploadContract(Long leaseId, MultipartFile file, Long userId) {
         LeaseAgreement lease = leaseRepository.findById(leaseId)
-                .orElseThrow(() -> new RuntimeException("Sözleşme bulunamadı: " + leaseId));
+                .orElseThrow(() -> new ResourceNotFoundException("Sözleşme bulunamadı: " + leaseId));
 
         if (userId != null) {
             User user = userRepository.findById(userId).orElse(null);
@@ -286,8 +329,9 @@ public class LeaseService {
             }
         }
 
-        String fileUrl = fileStorageService.storeFile(file);
-        lease.setContractFileUrl(fileUrl);
+        String storedPath = fileStorageService.storeFile(file);
+        lease.setContractFilePath(storedPath);
+        lease.setContractFileUrl("/api/files/contracts/" + lease.getId());
         return leaseRepository.save(lease);
     }
 

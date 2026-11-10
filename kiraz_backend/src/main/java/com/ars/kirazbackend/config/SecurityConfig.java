@@ -20,6 +20,7 @@ public class SecurityConfig {
 
     private final UserAuthenticationFilter userAuthenticationFilter;
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    private final InviteRateLimitingFilter inviteRateLimitingFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -45,6 +46,7 @@ public class SecurityConfig {
                 ).permitAll()
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(inviteRateLimitingFilter, org.springframework.security.web.context.SecurityContextHolderFilter.class)
             .addFilterBefore(userAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
