@@ -554,10 +554,9 @@ public class Adim3bSecurityAndContractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(leaseA.getId()));
 
-        // Deprecated: GET /api/properties/landlord
+        // Deprecated (Removed): GET /api/properties/landlord -> 404 Not Found
         mockMvc.perform(get("/api/properties/landlord").header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(propertyA.getId()));
+                .andExpect(status().isNotFound());
     }
 
     @Test

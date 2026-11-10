@@ -87,41 +87,6 @@ public class LeaseController {
         return ResponseEntity.ok(leaseService.getLeasesForProperty(propertyId));
     }
 
-    @Deprecated
-    @GetMapping("/tenant")
-    @PreAuthorize("hasRole('TENANT')")
-    @Operation(summary = "Kiracı sözleşmeleri (Deprecated - yerine /api/tenant/leases kullanın)", deprecated = true)
-    public ResponseEntity<List<LeaseAgreement>> getLeasesForTenant() {
-        User tenant = authz.getCurrentUser();
-        if (tenant == null || tenant.getId() == null) {
-            throw new RuntimeException("Kiracı kimliği belirlenemedi.");
-        }
-        return ResponseEntity.ok(leaseService.getLeasesForTenant(tenant.getId()));
-    }
-
-    @Deprecated
-    @GetMapping("/landlord")
-    @PreAuthorize("hasRole('LANDLORD')")
-    @Operation(summary = "Ev sahibi sözleşmeleri (Deprecated - yerine /api/landlord/leases kullanın)", deprecated = true)
-    public ResponseEntity<List<LeaseAgreement>> getLeasesForLandlord() {
-        User landlord = authz.getCurrentUser();
-        if (landlord == null || landlord.getId() == null) {
-            throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
-        }
-        return ResponseEntity.ok(leaseService.getLeasesForLandlord(landlord.getId()));
-    }
-
-    @Deprecated
-    @GetMapping("/pending-approvals")
-    @PreAuthorize("hasRole('LANDLORD')")
-    @Operation(summary = "Onay bekleyen sözleşmeler (Deprecated - yerine /api/landlord/leases/pending-approvals kullanın)", deprecated = true)
-    public ResponseEntity<List<LeaseAgreement>> getPendingApprovals() {
-        User landlord = authz.getCurrentUser();
-        if (landlord == null || landlord.getId() == null) {
-            throw new RuntimeException("Ev sahibi kimliği belirlenemedi.");
-        }
-        return ResponseEntity.ok(leaseService.getPendingApprovalLeasesForLandlord(landlord.getId()));
-    }
 
     @GetMapping("/{leaseId}/periods")
     @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
@@ -139,7 +104,7 @@ public class LeaseController {
         return ResponseEntity.ok(leaseService.activateLeaseDirectly(id));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
     @Operation(summary = "Sözleşme detayını getir (Kanonik)")
     public ResponseEntity<LeaseAgreement> getLeaseById(@PathVariable Long id) {
@@ -156,27 +121,5 @@ public class LeaseController {
         authz.checkCanUploadContract(id);
         Long userId = authz.getCurrentUserId();
         return ResponseEntity.ok(leaseService.uploadContract(id, file, userId));
-    }
-
-    @Deprecated
-    @PutMapping("/{id}/approve")
-    @PreAuthorize("hasRole('LANDLORD')")
-    @Operation(summary = "Sözleşmeyi onayla (Deprecated - yerine POST /api/landlord/leases/{id}/approve kullanın)", deprecated = true)
-    public ResponseEntity<LeaseAgreement> approveLease(@PathVariable Long id) {
-        authz.checkCanApproveOrRejectLease(id);
-        Long landlordId = authz.getCurrentUserId();
-        return ResponseEntity.ok(leaseService.approveLease(id, landlordId));
-    }
-
-    @Deprecated
-    @PutMapping("/{id}/reject")
-    @PreAuthorize("hasRole('LANDLORD')")
-    @Operation(summary = "Sözleşmeyi reddet (Deprecated - yerine POST /api/landlord/leases/{id}/reject kullanın)", deprecated = true)
-    public ResponseEntity<LeaseAgreement> rejectLease(
-            @PathVariable Long id,
-            @RequestParam(required = false) String reason) {
-        authz.checkCanApproveOrRejectLease(id);
-        Long landlordId = authz.getCurrentUserId();
-        return ResponseEntity.ok(leaseService.rejectLease(id, landlordId, reason));
     }
 }

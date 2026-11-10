@@ -2,12 +2,9 @@ package com.ars.kirazbackend.controller;
 
 import com.ars.kirazbackend.dto.PayTrInitRequest;
 import com.ars.kirazbackend.dto.PayTrInitResponse;
-import com.ars.kirazbackend.dto.PaymentSummaryResponse;
-import com.ars.kirazbackend.entity.RentPeriod;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.PayTrService;
-import com.ars.kirazbackend.service.RentPeriodService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,7 +16,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @RestController
@@ -29,7 +25,6 @@ import org.springframework.web.multipart.MultipartFile;
 public class PaymentController {
 
     private final PayTrService payTrService;
-    private final RentPeriodService rentPeriodService;
     private final AccessControlService authz;
 
     /**
@@ -64,39 +59,7 @@ public class PaymentController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Kiracının Havale/EFT dekontu yüklediği endpoint (Deprecated - yerine POST /api/tenant/receipts/{periodId} kullanın).
-     */
-    @Deprecated
-    @PostMapping(value = "/{periodId}/receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('TENANT')")
-    @Operation(summary = "Havale/EFT dekontu yükle (Deprecated - yerine POST /api/tenant/receipts/{periodId} kullanın)", deprecated = true)
-    public ResponseEntity<RentPeriod> uploadReceipt(
-            @PathVariable Long periodId,
-            @RequestParam("file") MultipartFile file) {
 
-        authz.checkCanUploadReceipt(periodId);
-
-        log.info("Havale/EFT dekontu yükleme isteği alındı: periodId={}", periodId);
-        RentPeriod updated = rentPeriodService.uploadReceipt(periodId, file);
-        return ResponseEntity.ok(updated);
-    }
-
-    /**
-     * Kiracının anlık finansal özetini döner (Deprecated - yerine GET /api/tenant/payments/summary kullanın).
-     */
-    @Deprecated
-    @GetMapping("/summary")
-    @PreAuthorize("hasRole('TENANT')")
-    @Operation(summary = "Kiracı ödeme özeti (Deprecated - yerine GET /api/tenant/payments/summary kullanın)", deprecated = true)
-    public ResponseEntity<PaymentSummaryResponse> getPaymentSummary() {
-        User user = authz.getCurrentUser();
-        if (user == null || user.getId() == null) {
-            throw new RuntimeException("Kiracı kimliği doğrulanamadı.");
-        }
-        PaymentSummaryResponse response = rentPeriodService.getTenantPaymentSummary(user.getId());
-        return ResponseEntity.ok(response);
-    }
 
     private String resolveClientIp(HttpServletRequest request) {
         String clientIp = request.getHeader("X-Forwarded-For");

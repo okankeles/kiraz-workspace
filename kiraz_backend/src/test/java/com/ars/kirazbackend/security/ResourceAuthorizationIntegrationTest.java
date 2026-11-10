@@ -314,7 +314,7 @@ public class ResourceAuthorizationIntegrationTest {
     void testLease_LandlordB_CannotApproveLeaseA_Returns404() throws Exception {
         String tokenB = AuthTestHelper.generateValidToken(landlordB);
 
-        mockMvc.perform(put("/api/leases/" + leaseA.getId() + "/approve")
+        mockMvc.perform(post("/api/landlord/leases/" + leaseA.getId() + "/approve")
                         .header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
@@ -410,7 +410,7 @@ public class ResourceAuthorizationIntegrationTest {
                 "file", "dekont.pdf", "application/pdf", "dummy content".getBytes()
         );
 
-        mockMvc.perform(multipart("/api/payments/" + periodA.getId() + "/receipt")
+        mockMvc.perform(multipart("/api/tenant/receipts/" + periodA.getId())
                         .file(file)
                         .header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isNotFound())
@@ -514,7 +514,7 @@ public class ResourceAuthorizationIntegrationTest {
     }
 
     // ==========================================
-    // 7. Kaldırılan Uç Noktalar (PUT /api/periods/{id}/status)
+    // 7. Kaldırılan Uç Noktalar (Deprecated -> Removed => 404)
     // ==========================================
 
     @Test
@@ -525,5 +525,65 @@ public class ResourceAuthorizationIntegrationTest {
                         .param("status", "PAID")
                         .header("Authorization", "Bearer " + tokenA))
                 .andExpect(status().isNotFound()); // Endpoint has been removed completely
+    }
+
+    @Test
+    void testRemovedDeprecatedEndpoints_Return404() throws Exception {
+        String landlordToken = AuthTestHelper.generateValidToken(landlordA);
+        String tenantToken = AuthTestHelper.generateValidToken(tenantA);
+
+        // 1. Property deprecated listing endpoints (GET was removed; /api/properties only supports POST)
+        mockMvc.perform(get("/api/properties").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(get("/api/properties/landlord").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/properties/agent").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+
+        // 2. Lease deprecated endpoints
+        mockMvc.perform(get("/api/leases/landlord").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/leases/tenant").header("Authorization", "Bearer " + tenantToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/leases/pending-approvals").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put("/api/leases/" + leaseA.getId() + "/approve").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put("/api/leases/" + leaseA.getId() + "/reject").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+
+        // 3. Delegation deprecated endpoints
+        mockMvc.perform(post("/api/delegations").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put("/api/delegations/1/revoke").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/delegations/landlord").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/delegations/agent").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/delegations/agent/active").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+
+        // 4. Payment & Period deprecated endpoints
+        mockMvc.perform(get("/api/payments/summary").header("Authorization", "Bearer " + tenantToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(multipart("/api/payments/" + periodA.getId() + "/receipt").header("Authorization", "Bearer " + tenantToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(multipart("/api/periods/" + periodA.getId() + "/receipt").header("Authorization", "Bearer " + tenantToken))
+                .andExpect(status().isNotFound());
+
+        // 5. Dashboard deprecated endpoints
+        mockMvc.perform(get("/api/dashboard/landlord").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/dashboard/tenant").header("Authorization", "Bearer " + tenantToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/dashboard/agent").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+
+        // 6. Notification & AuditLog deprecated endpoints
+        mockMvc.perform(get("/api/notifications").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/audit-logs/user").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
     }
 }

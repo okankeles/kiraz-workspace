@@ -23,28 +23,17 @@ public class NotificationController {
     private final AccessControlService authz;
 
     /**
-     * Kullanıcının okunmamış bildirimlerini döner (Deprecated - yerine GET /api/notifications/unread kullanın).
+     * Kullanıcının okunmamış bildirimlerini döner (Kanonik uç).
      */
-    @Deprecated
-    @GetMapping
+    @GetMapping("/unread")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Okunmamış bildirimler (Deprecated - yerine GET /api/notifications/unread kullanın)", deprecated = true)
+    @Operation(summary = "Okunmamış bildirimleri listele (Kanonik)")
     public ResponseEntity<List<Notification>> getUnreadNotifications() {
         User user = authz.getCurrentUser();
         if (user == null || user.getId() == null) {
             throw new RuntimeException("Kullanıcı kimliği belirlenemedi.");
         }
         return ResponseEntity.ok(notificationService.getUnreadNotifications(user.getId()));
-    }
-
-    /**
-     * Kullanıcının okunmamış bildirimlerini döner (Kanonik uç).
-     */
-    @GetMapping("/unread")
-    @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Okunmamış bildirimleri listele (Kanonik)")
-    public ResponseEntity<List<Notification>> getUnreadNotificationsExplicit() {
-        return getUnreadNotifications();
     }
 
     /**

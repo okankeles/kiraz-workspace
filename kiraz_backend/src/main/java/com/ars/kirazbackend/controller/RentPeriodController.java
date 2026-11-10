@@ -6,12 +6,10 @@ import com.ars.kirazbackend.service.RentPeriodService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.util.List;
 
 @RestController
@@ -23,10 +21,9 @@ public class RentPeriodController {
     private final RentPeriodService rentPeriodService;
     private final AccessControlService authz;
 
-    @Deprecated
     @GetMapping("/lease/{leaseId}")
     @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
-    @Operation(summary = "Sözleşmeye ait dönemleri listele (Deprecated - yerine GET /api/leases/{leaseId}/periods kullanın)", deprecated = true)
+    @Operation(summary = "Sözleşmeye ait dönemleri listele (Kanonik)")
     public ResponseEntity<List<RentPeriod>> getPeriodsByLeaseId(@PathVariable Long leaseId) {
         authz.checkCanViewLease(leaseId);
         return ResponseEntity.ok(rentPeriodService.getPeriodsByLeaseId(leaseId));
@@ -38,17 +35,6 @@ public class RentPeriodController {
     public ResponseEntity<RentPeriod> getPeriodById(@PathVariable Long id) {
         authz.checkCanViewPeriod(id);
         return ResponseEntity.ok(rentPeriodService.getPeriodById(id));
-    }
-
-    @Deprecated
-    @PostMapping(value = "/{id}/receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('TENANT')")
-    @Operation(summary = "Dekont yükle (Deprecated - yerine POST /api/tenant/receipts/{periodId} kullanın)", deprecated = true)
-    public ResponseEntity<RentPeriod> uploadReceipt(
-            @PathVariable Long id,
-            @RequestParam("file") MultipartFile file) {
-        authz.checkCanUploadReceipt(id);
-        return ResponseEntity.ok(rentPeriodService.uploadReceipt(id, file));
     }
 
     @PutMapping("/{id}/legal-process")

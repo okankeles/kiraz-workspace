@@ -43,12 +43,4 @@ public class AuditLogController {
         }
         return ResponseEntity.ok(auditLogService.getLogsForUser(user.getId()));
     }
-
-    @Deprecated
-    @GetMapping("/user")
-    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
-    @Operation(summary = "Kullanıcı logları (Deprecated - yerine GET /api/audit-logs/my-logs kullanın)", deprecated = true)
-    public ResponseEntity<List<AuditLog>> getUserLogs() {
-        return getMyLogs();
-    }
 }

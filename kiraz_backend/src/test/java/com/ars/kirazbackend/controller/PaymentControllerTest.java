@@ -47,8 +47,6 @@ class PaymentControllerTest {
     @Mock
     private PayTrService payTrService;
 
-    @Mock
-    private RentPeriodService rentPeriodService;
 
     @Mock
     private com.ars.kirazbackend.service.AccessControlService authz;
@@ -122,49 +120,18 @@ class PaymentControllerTest {
     }
 
     @Test
-    void testGetPaymentSummary_ReturnsSummary() throws Exception {
-        LocalDate nextDate = LocalDate.now().plusDays(10);
-        PaymentSummaryResponse summaryResponse = PaymentSummaryResponse.builder()
-                .totalDebt(BigDecimal.valueOf(1000))
-                .totalPaid(BigDecimal.valueOf(5000))
-                .nextPaymentDate(nextDate)
-                .nextPaymentAmount(BigDecimal.valueOf(1000))
-                .build();
-
-        when(rentPeriodService.getTenantPaymentSummary(10L)).thenReturn(summaryResponse);
-
+    void testGetPaymentSummary_DeprecatedEndpoint_ReturnsNotFound() throws Exception {
         mockMvc.perform(get("/api/payments/summary"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalDebt").value(1000))
-                .andExpect(jsonPath("$.totalPaid").value(5000))
-                .andExpect(jsonPath("$.nextPaymentDate").value(nextDate.toString()))
-                .andExpect(jsonPath("$.nextPaymentAmount").value(1000));
-
-        verify(rentPeriodService).getTenantPaymentSummary(10L);
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void testUploadReceipt_ReturnsUpdatedPeriod() throws Exception {
+    void testUploadReceipt_DeprecatedEndpoint_ReturnsNotFound() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "dekont.pdf", "application/pdf", "dummy receipt pdf content".getBytes()
         );
 
-        RentPeriod mockPeriod = RentPeriod.builder()
-                .id(50L)
-                .month(11)
-                .year(2026)
-                .receiptImageUrl("/uploads/receipts/dekont.pdf")
-                .status(PaymentStatus.WAITING_APPROVAL)
-                .build();
-
-        when(rentPeriodService.uploadReceipt(eq(50L), any(MultipartFile.class))).thenReturn(mockPeriod);
-
         mockMvc.perform(multipart("/api/payments/50/receipt").file(file))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(50))
-                .andExpect(jsonPath("$.status").value("WAITING_APPROVAL"))
-                .andExpect(jsonPath("$.receiptImageUrl").value("/api/files/receipts/50"));
-
-        verify(rentPeriodService).uploadReceipt(eq(50L), any(MultipartFile.class));
+                .andExpect(status().isNotFound());
     }
 }
