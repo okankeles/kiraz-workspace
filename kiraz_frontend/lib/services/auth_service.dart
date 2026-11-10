@@ -16,15 +16,21 @@ class AuthService {
         _httpClient = httpClient ?? http.Client();
 
   Future<void> _persistSession(AuthResponse authResponse) async {
-    // 1. JWT Tokens to FlutterSecureStorage
+    // 1. JWT Tokens ve kullanıcı profil bilgileri FlutterSecureStorage'a
     if (authResponse.accessToken.isNotEmpty) {
       await _tokenStorage.saveTokens(
         accessToken: authResponse.accessToken,
         refreshToken: authResponse.refreshToken,
       );
     }
+    await _tokenStorage.saveUserData(
+      id: authResponse.user.id,
+      role: authResponse.user.role,
+      fullName: authResponse.user.fullName,
+      email: authResponse.user.email,
+    );
 
-    // 2. User profile info to SharedPreferences
+    // 2. Kullanıcı profil bilgileri SharedPreferences'a (ekranlar ve senkron erişim için)
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('userId', authResponse.user.id);
     await prefs.setString('role', authResponse.user.role);
@@ -125,13 +131,47 @@ class AuthService {
     } catch (_) {}
 
     // Clear secure storage and shared preferences
-    await _tokenStorage.clearTokens();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('userId');
-    await prefs.remove('role');
-    await prefs.remove('fullName');
-    await prefs.remove('email');
-    await prefs.remove('token');
-    await prefs.remove('referenceCode');
+    try {
+      await _tokenStorage.clearTokens();
+    } catch (_) {}
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('userId');
+      await prefs.remove('role');
+      await prefs.remove('fullName');
+      await prefs.remove('email');
+      await prefs.remove('token');
+      await prefs.remove('referenceCode');
+      await prefs.remove('isLoggedIn');
+    } catch (_) {}
+  }
+
+  static const String legacyMigrationKey = 'jwt_legacy_migration_v1_done';
+
+  /// JWT öncesinden kalan legacy shared_preferences oturum verilerini ilk açılışta bir kez temizler.
+  static Future<void> migrateLegacySession({SharedPreferences? prefs}) async {
+    try {
+      final p = prefs ?? await SharedPreferences.getInstance();
+      final isDone = p.getBool(legacyMigrationKey) ?? false;
+      if (!isDone) {
+        final legacyKeys = [
+          'userId',
+          'role',
+          'isLoggedIn',
+          'email',
+          'fullName',
+          'token',
+          'referenceCode',
+          'tenantName',
+          'userRole',
+          'userName',
+        ];
+        for (final key in legacyKeys) {
+          await p.remove(key);
+        }
+        await p.setBool(legacyMigrationKey, true);
+      }
+    } catch (_) {}
   }
 }

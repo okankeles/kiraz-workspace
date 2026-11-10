@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../utils/constants.dart';
 import 'token_storage.dart';
@@ -154,9 +154,20 @@ class ApiClient {
   }
 
   Future<void> _handleSessionExpired() async {
-    await _tokenStorage.clearTokens();
-    onSessionExpired?.call();
+    try {
+      await _tokenStorage.clearTokens();
+    } on PlatformException {
+      // PlatformException durumunda asla dışarı hata sızdırılmaz
+    } catch (_) {}
+
+    try {
+      onSessionExpired?.call();
+    } catch (_) {}
   }
+
+  /// Oturum süresi dolduğunda veya yetkilendirme kaybedildiğinde çağrılır.
+  /// Hiçbir koşulda exception fırlatmaz; her koşulda oturumu kapatıp onSessionExpired tetikler.
+  Future<void> handleSessionExpired() => _handleSessionExpired();
 
   String _extractErrorMessage(http.Response response) {
     try {

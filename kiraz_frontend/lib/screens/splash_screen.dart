@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'auth/role_selection_screen.dart';
+import '../services/auth_service.dart';
+import '../services/token_storage.dart';
+import 'auth/login_screen.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'onboarding_screen.dart';
 
@@ -27,14 +29,31 @@ class _SplashScreenState extends State<SplashScreen> {
     await Future.delayed(const Duration(milliseconds: 2500));
     if (!mounted) return;
 
+    // 1. JWT öncesi legacy shared_preferences temizliği (ilk açılışta bir kez)
+    await AuthService.migrateLegacySession();
+
+    // 2. Açılışta oturumun açık sayılması YALNIZCA secure storage'da refresh token bulunmasına bağlıdır.
+    final tokenStorage = TokenStorage();
+    final hasSession = await tokenStorage.hasRefreshToken();
+
     final prefs = await SharedPreferences.getInstance();
-    final hasUser = prefs.getInt('userId') != null ||
-        (prefs.getString('token') != null && prefs.getString('token')!.isNotEmpty);
     final isFirstLaunch = prefs.getBool('isFirstLaunch') ?? true;
 
     if (!mounted) return;
 
-    if (hasUser) {
+    if (hasSession) {
+      // Secure storage'daki profil bilgilerini SharedPreferences ile senkronize et
+      final role = await tokenStorage.getUserRole();
+      final fullName = await tokenStorage.getUserFullName();
+      final userId = await tokenStorage.getUserId();
+      final email = await tokenStorage.getUserEmail();
+      if (role != null) await prefs.setString('role', role);
+      if (fullName != null) await prefs.setString('fullName', fullName);
+      if (userId != null) await prefs.setInt('userId', userId);
+      if (email != null) await prefs.setString('email', email);
+
+      if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const DashboardScreen()),
@@ -47,7 +66,7 @@ class _SplashScreenState extends State<SplashScreen> {
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     }
   }
