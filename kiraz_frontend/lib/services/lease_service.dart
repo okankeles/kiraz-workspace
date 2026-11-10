@@ -2,188 +2,107 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/lease.dart';
-import '../utils/constants.dart';
+import 'api_client.dart';
 
 class LeaseService {
-  Future<Map<String, String>> _getHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('userId');
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
-    if (userId != null) {
-      headers['X-User-Id'] = userId.toString();
-      headers['Authorization'] = 'Bearer $userId';
-    }
-    return headers;
-  }
+  final ApiClient _apiClient;
 
+  LeaseService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient.instance;
+
+  /// Bir mülke ait sözleşmeleri çeker.
+  /// GET /api/leases/property/{propertyId}
   Future<List<Lease>> getLeasesForProperty(int propertyId) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases/property/$propertyId');
-    final headers = await _getHeaders();
+    final uri = _apiClient.resolveUri('/leases/property/$propertyId');
+    final response = await _apiClient.get(uri);
 
-    try {
-      final response = await http.get(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        if (data is List) {
-          return data
-              .map((item) => Lease.fromJson(item as Map<String, dynamic>))
-              .toList();
-        }
-        return [];
-      } else {
-        throw Exception('Sözleşmeler alınamadı: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Sözleşme listesi alınırken hata oluştu: $e');
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((item) => Lease.fromJson(item))
+          .toList();
     }
+    return [];
   }
 
-  Future<List<Lease>> getLeasesForTenant(int tenantId) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases/tenant/$tenantId');
-    final headers = await _getHeaders();
+  /// Kiracıya ait sözleşmeleri çeker.
+  /// GET /api/tenant/leases
+  Future<List<Lease>> getLeasesForTenant([int? tenantId]) async {
+    final uri = _apiClient.resolveUri('/tenant/leases');
+    final response = await _apiClient.get(uri);
 
-    try {
-      final response = await http.get(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        if (data is List) {
-          return data
-              .map((item) => Lease.fromJson(item as Map<String, dynamic>))
-              .toList();
-        }
-        return [];
-      } else {
-        throw Exception('Sözleşmeler alınamadı: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Sözleşme listesi alınırken hata oluştu: $e');
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((item) => Lease.fromJson(item))
+          .toList();
     }
+    return [];
   }
 
-  Future<List<Lease>> getLeasesForLandlord(int landlordId) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases/landlord/$landlordId');
-    final headers = await _getHeaders();
+  /// Ev sahibine ait sözleşmeleri çeker.
+  /// GET /api/landlord/leases
+  Future<List<Lease>> getLeasesForLandlord([int? landlordId]) async {
+    final uri = _apiClient.resolveUri('/landlord/leases');
+    final response = await _apiClient.get(uri);
 
-    try {
-      final response = await http.get(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        if (data is List) {
-          return data
-              .map((item) => Lease.fromJson(item as Map<String, dynamic>))
-              .toList();
-        }
-        return [];
-      } else {
-        throw Exception('Ev sahibi sözleşmeleri alınamadı: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Sözleşme listesi alınırken hata oluştu: $e');
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((item) => Lease.fromJson(item))
+          .toList();
     }
+    return [];
   }
 
-  Future<List<Lease>> getPendingApprovalsForLandlord(int landlordId) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases/landlord/$landlordId/pending-approvals');
-    final headers = await _getHeaders();
+  /// Ev sahibi için onay bekleyen sözleşmeleri çeker.
+  /// GET /api/landlord/leases/pending-approvals
+  Future<List<Lease>> getPendingApprovalsForLandlord([int? landlordId]) async {
+    final uri = _apiClient.resolveUri('/landlord/leases/pending-approvals');
+    final response = await _apiClient.get(uri);
 
-    try {
-      final response = await http.get(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        if (data is List) {
-          return data
-              .map((item) => Lease.fromJson(item as Map<String, dynamic>))
-              .toList();
-        }
-        return [];
-      } else {
-        throw Exception('Onay bekleyen sözleşmeler alınamadı: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Onay listesi alınırken hata: $e');
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((item) => Lease.fromJson(item))
+          .toList();
     }
+    return [];
   }
 
+  /// Ev sahibinin emlakçı tarafından açılan sözleşmeyi onaylaması.
+  /// POST /api/landlord/leases/{id}/approve
   Future<Lease> approveLease(int leaseId, {int? landlordId}) async {
-    int? effectiveLandlordId = landlordId;
-    if (effectiveLandlordId == null) {
-      final prefs = await SharedPreferences.getInstance();
-      effectiveLandlordId = prefs.getInt('userId');
-    }
+    final uri = _apiClient.resolveUri('/landlord/leases/$leaseId/approve');
+    final response = await _apiClient.post(uri, body: {});
 
-    final query = effectiveLandlordId != null ? '?landlordId=$effectiveLandlordId' : '';
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases/$leaseId/approve$query');
-    final headers = await _getHeaders();
-
-    try {
-      final response = await http.put(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        return Lease.fromJson(data as Map<String, dynamic>);
-      } else {
-        String msg = 'Sözleşme onaylanamadı (${response.statusCode})';
-        try {
-          final errorData = json.decode(utf8.decode(response.bodyBytes));
-          if (errorData is Map && errorData.containsKey('message')) {
-            msg = errorData['message'].toString();
-          }
-        } catch (_) {}
-        throw Exception(msg);
-      }
-    } catch (e) {
-      throw Exception(e.toString().replaceAll('Exception: ', ''));
-    }
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    return Lease.fromJson(data as Map<String, dynamic>);
   }
 
+  /// Ev sahibinin emlakçı tarafından açılan sözleşmeyi reddetmesi.
+  /// POST /api/landlord/leases/{id}/reject
   Future<Lease> rejectLease(int leaseId, {int? landlordId, String? reason}) async {
-    int? effectiveLandlordId = landlordId;
-    if (effectiveLandlordId == null) {
-      final prefs = await SharedPreferences.getInstance();
-      effectiveLandlordId = prefs.getInt('userId');
-    }
+    final cleanReason = reason?.trim() ?? '';
+    final uri = _apiClient.resolveUri(
+      '/landlord/leases/$leaseId/reject',
+      cleanReason.isNotEmpty ? {'reason': cleanReason} : null,
+    );
+    final response = await _apiClient.post(
+      uri,
+      body: {'reason': cleanReason},
+    );
 
-    final queryParams = <String, String>{};
-    if (effectiveLandlordId != null) {
-      queryParams['landlordId'] = effectiveLandlordId.toString();
-    }
-    if (reason != null && reason.trim().isNotEmpty) {
-      queryParams['reason'] = reason.trim();
-    }
-
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases/$leaseId/reject')
-        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
-    final headers = await _getHeaders();
-
-    try {
-      final response = await http.put(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        return Lease.fromJson(data as Map<String, dynamic>);
-      } else {
-        String msg = 'Sözleşme reddedilemedi (${response.statusCode})';
-        try {
-          final errorData = json.decode(utf8.decode(response.bodyBytes));
-          if (errorData is Map && errorData.containsKey('message')) {
-            msg = errorData['message'].toString();
-          }
-        } catch (_) {}
-        throw Exception(msg);
-      }
-    } catch (e) {
-      throw Exception(e.toString().replaceAll('Exception: ', ''));
-    }
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    return Lease.fromJson(data as Map<String, dynamic>);
   }
 
+  /// Yeni sözleşme oluşturur.
+  /// POST /api/leases
   Future<Lease> createLease(
     int propertyId,
     String tenantName,
@@ -193,10 +112,7 @@ class LeaseService {
     double? depositAmount,
     int? userId,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final effectiveUserId = userId ?? prefs.getInt('userId');
-
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases');
+    final uri = _apiClient.resolveUri('/leases');
 
     final Map<String, dynamic> body = {
       'propertyId': propertyId,
@@ -205,157 +121,118 @@ class LeaseService {
       'rentAmount': rentAmount,
       'startDate': startDate,
     };
-    if (effectiveUserId != null) {
-      body['userId'] = effectiveUserId;
-    }
     if (depositAmount != null) {
       body['depositAmount'] = depositAmount;
     }
 
-    final headers = await _getHeaders();
-
-    final http.Response response;
-    try {
-      response = await http.post(
-        url,
-        headers: headers,
-        body: json.encode(body),
-      );
-    } catch (e) {
-      throw Exception('Bağlantı hatası: $e');
-    }
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-      return Lease.fromJson(data as Map<String, dynamic>);
-    } else {
-      String msg = 'Kiracı atanamadı: ${response.statusCode}';
-      try {
-        final errorData = json.decode(utf8.decode(response.bodyBytes));
-        if (errorData is Map && errorData.containsKey('message')) {
-          msg = errorData['message'].toString();
-        }
-      } catch (_) {}
-      throw Exception(msg);
-    }
+    final response = await _apiClient.post(uri, body: body);
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    return Lease.fromJson(data as Map<String, dynamic>);
   }
 
-  Future<String?> acceptLease(String inviteCode, String newPassword) async {
-    final url = Uri.parse(
-      '${ApiConstants.baseUrl}/leases/accept?inviteCode=${Uri.encodeComponent(inviteCode)}&newPassword=${Uri.encodeComponent(newPassword)}',
+  /// Davet kodunu doğrular.
+  /// GET /api/leases/validate-invite?inviteCode=... (Kimlik doğrulamasız)
+  Future<Map<String, dynamic>> validateInvite(String inviteCode) async {
+    final uri = _apiClient.resolveUri(
+      '/leases/validate-invite',
+      {'inviteCode': inviteCode.trim()},
     );
 
-    try {
-      final response = await http.post(url);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        if (data is Map) {
-          return data['tenantEmail'] as String? ??
-              (data['tenant'] is Map ? data['tenant']['email'] as String? : null);
-        }
-        return null;
-      } else {
-        String msg = 'Davet kodu onaylanamadı: ${response.statusCode}';
-        try {
-          final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-          if (data is Map && data['message'] != null) {
-            msg = data['message'].toString();
-          }
-        } catch (_) {}
-        throw Exception(msg);
-      }
-    } catch (e) {
-      throw Exception(e.toString().replaceAll('Exception: ', ''));
-    }
+    final response = await _apiClient.get(uri, requiresAuth: false);
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    return data is Map<String, dynamic> ? data : <String, dynamic>{};
   }
 
+  /// Daveti kabul eder ve şifre belirler.
+  /// POST /api/leases/accept (Kimlik doğrulamasız)
+  Future<String?> acceptLease(String inviteCode, String newPassword) async {
+    final uri = _apiClient.resolveUri('/leases/accept');
+    final response = await _apiClient.post(
+      uri,
+      body: {
+        'inviteCode': inviteCode.trim(),
+        'newPassword': newPassword,
+      },
+      requiresAuth: false,
+    );
+
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    if (data is Map) {
+      return data['tenantEmail'] as String? ??
+          (data['tenant'] is Map ? data['tenant']['email'] as String? : null);
+    }
+    return null;
+  }
+
+  /// Sözleşmeyi aktif eder (Ev sahibi onayı yoksa 409 döner).
+  /// PUT /api/leases/{id}/activate
   Future<void> activateLease(int leaseId) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases/$leaseId/activate');
-    final headers = await _getHeaders();
-
+    final uri = _apiClient.resolveUri('/leases/$leaseId/activate');
     try {
-      final response = await http.put(
-        url,
-        headers: headers,
-      );
-
-      if (response.statusCode != 200 && response.statusCode != 204) {
-        String msg = 'Sözleşme onaylanamadı: ${response.statusCode}';
-        try {
-          final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-          if (data is Map && data['message'] != null) {
-            msg = data['message'].toString();
-          }
-        } catch (_) {}
-        throw Exception(msg);
-      }
+      await _apiClient.put(uri);
     } catch (e) {
-      throw Exception(e.toString().replaceAll('Exception: ', ''));
+      if (e is ApiException && e.statusCode == 409) {
+        throw ApiException(
+          statusCode: 409,
+          message: 'Ev sahibi onayı bekleniyor. Sözleşme henüz onaylanmamış.',
+        );
+      }
+      rethrow;
     }
   }
 
+  /// Tek bir sözleşme detayını çeker.
+  /// GET /api/leases/{id}
   Future<Lease> getLeaseById(int id) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases/$id');
-    final headers = await _getHeaders();
+    final uri = _apiClient.resolveUri('/leases/$id');
+    final response = await _apiClient.get(uri);
 
-    try {
-      final response = await http.get(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        return Lease.fromJson(data as Map<String, dynamic>);
-      } else {
-        throw Exception('Sözleşme bilgisi alınamadı: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Sözleşme detayı alınırken hata: $e');
-    }
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    return Lease.fromJson(data as Map<String, dynamic>);
   }
 
+  /// Sözleşme belgesi yükler.
+  /// POST /api/leases/{id}/upload-contract (Multipart, alan adı "file")
   Future<void> uploadContract(int leaseId, File file) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/leases/$leaseId/contract');
+    final bytes = await file.readAsBytes();
 
-    try {
-      final request = http.MultipartRequest('POST', url);
+    // 10 MB sınır kontrolü (10 * 1024 * 1024 bytes)
+    if (bytes.length > 10 * 1024 * 1024) {
+      throw ApiException(
+        statusCode: 400,
+        message: 'Dosya boyutu 10 MB\'tan büyük olamaz.',
+      );
+    }
 
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getInt('userId');
-      if (userId != null) {
-        request.headers['X-User-Id'] = userId.toString();
-        request.headers['Authorization'] = 'Bearer $userId';
-      }
+    final filename = file.path.split(Platform.pathSeparator).last;
+    final ext = filename.contains('.') ? filename.split('.').last.toLowerCase() : '';
 
-      final bytes = await file.readAsBytes();
-      final filename = file.path.split(Platform.pathSeparator).last;
-      final ext = filename.contains('.') ? filename.split('.').last.toLowerCase() : '';
+    MediaType? contentType;
+    if (ext == 'png') {
+      contentType = MediaType('image', 'png');
+    } else if (ext == 'jpg' || ext == 'jpeg') {
+      contentType = MediaType('image', 'jpeg');
+    } else if (ext == 'pdf') {
+      contentType = MediaType('application', 'pdf');
+    } else {
+      throw ApiException(
+        statusCode: 400,
+        message: 'Yalnızca PDF, JPEG ve PNG formatları desteklenmektedir.',
+      );
+    }
 
-      MediaType? contentType;
-      if (ext == 'png') {
-        contentType = MediaType('image', 'png');
-      } else if (ext == 'jpg' || ext == 'jpeg') {
-        contentType = MediaType('image', 'jpeg');
-      } else if (ext == 'pdf') {
-        contentType = MediaType('application', 'pdf');
-      }
+    final uri = _apiClient.resolveUri('/leases/$leaseId/upload-contract');
 
+    await _apiClient.sendMultipart(() async {
+      final request = http.MultipartRequest('POST', uri);
       final multipartFile = http.MultipartFile.fromBytes(
         'file',
         bytes,
         filename: filename,
         contentType: contentType,
       );
-
       request.files.add(multipartFile);
-
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception('Sözleşme yüklenemedi: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Sözleşme yükleme hatası: $e');
-    }
+      return request;
+    });
   }
 }
