@@ -79,7 +79,7 @@ class PropertyService {
     return Property.fromJson(data as Map<String, dynamic>);
   }
 
-  /// Mülk bilgilerini günceller.
+  /// Mülk bilgilerini günceller (Yalnızca mülk sahibi LANDLORD).
   /// PUT /api/properties/{id}
   Future<Property> updateProperty(
     int id,
@@ -104,8 +104,30 @@ class PropertyService {
       payload['depositAmount'] = depositAmount;
     }
 
-    final response = await _apiClient.put(uri, body: payload);
-    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-    return Property.fromJson(data as Map<String, dynamic>);
+    try {
+      final response = await _apiClient.put(uri, body: payload);
+      final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+      return Property.fromJson(data as Map<String, dynamic>);
+    } catch (e) {
+      if (e is ApiException) {
+        if (e.statusCode == 403) {
+          throw ApiException(
+            statusCode: 403,
+            message: 'Bu mülkü düzenleme yetkiniz yok. Yalnızca mülk sahibi düzenleyebilir.',
+          );
+        } else if (e.statusCode == 404) {
+          throw ApiException(
+            statusCode: 404,
+            message: 'Mülk bulunamadı veya başka bir ev sahibine ait.',
+          );
+        } else if (e.statusCode == 400) {
+          throw ApiException(
+            statusCode: 400,
+            message: e.message.isNotEmpty ? e.message : 'Mülk başlığı boş veya eksik olamaz.',
+          );
+        }
+      }
+      rethrow;
+    }
   }
 }

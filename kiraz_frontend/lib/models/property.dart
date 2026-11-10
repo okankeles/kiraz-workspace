@@ -2,6 +2,7 @@ class Property {
   final int id;
   final String name;
   final String address;
+  final String? city;
   final String? tenantName;
   final String? tenantPhone;
   final String? tenantEmail;
@@ -12,6 +13,7 @@ class Property {
     required this.id,
     required this.name,
     required this.address,
+    this.city,
     this.tenantName,
     this.tenantPhone,
     this.tenantEmail,
@@ -37,6 +39,7 @@ class Property {
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id'].toString()) ?? 0,
       name: (json['name'] ?? json['title'] ?? '') as String,
       address: (json['address'] ?? '') as String,
+      city: json['city']?.toString(),
       tenantName: json['tenantName']?.toString() ??
           (json['tenant'] is Map ? json['tenant']['fullName']?.toString() : null),
       tenantPhone: json['tenantPhone']?.toString() ??
