@@ -9,10 +9,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/lease.dart';
 import '../../models/property.dart';
 import '../../models/property_delegation.dart';
+import '../../services/api_client.dart';
 import '../../services/delegation_service.dart';
 import '../../services/lease_service.dart';
 import '../tenant/rent_period_list_screen.dart';
 import 'assign_tenant_screen.dart';
+import 'edit_property_screen.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
   final Property property;
@@ -34,17 +36,193 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   final LeaseService _leaseService = LeaseService();
   final DelegationService _delegationService = DelegationService();
 
+  late Property _currentProperty;
   List<Lease> _leases = [];
   List<PropertyDelegation> _delegations = [];
   bool _isLoading = true;
   int? _uploadingLeaseId;
+  int? _regeneratingLeaseId;
   String _userRole = 'LANDLORD';
   int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _currentProperty = widget.property;
     _loadAllData();
+  }
+
+  Future<void> _onEditProperty() async {
+    final updated = await Navigator.push<Property>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditPropertyScreen(property: _currentProperty),
+      ),
+    );
+    if (updated != null) {
+      setState(() {
+        _currentProperty = updated;
+      });
+      _loadAllData();
+    }
+  }
+
+  Future<void> _regenerateInviteCode(Lease lease) async {
+    setState(() => _regeneratingLeaseId = lease.id);
+    try {
+      final response = await _leaseService.regenerateInviteCode(lease.id);
+
+      if (!mounted) return;
+      setState(() => _regeneratingLeaseId = null);
+
+      await _showInviteCodeDialog(response.inviteCode, response.inviteCodeExpiresAt);
+      await _loadAllData();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _regeneratingLeaseId = null);
+
+      String errorMsg;
+      if (e is ApiException) {
+        if (e.statusCode == 409) {
+          errorMsg = 'Kiracı zaten bağlanmış veya sözleşme artık aktif değil. Yeni davet kodu üretilemez.';
+        } else if (e.statusCode == 404) {
+          errorMsg = 'Sözleşme bulunamadı veya bu işlem için yetkiniz yok.';
+        } else {
+          errorMsg = e.message;
+        }
+      } else {
+        errorMsg = e.toString().replaceAll('Exception: ', '');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMsg),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showInviteCodeDialog(String code, DateTime? expiresAt) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textColor = isDark ? Colors.white : darkNavy;
+
+    String expiryStr = '';
+    if (expiresAt != null) {
+      final day = expiresAt.day.toString().padLeft(2, '0');
+      final month = expiresAt.month.toString().padLeft(2, '0');
+      final year = expiresAt.year;
+      final hour = expiresAt.hour.toString().padLeft(2, '0');
+      final minute = expiresAt.minute.toString().padLeft(2, '0');
+      expiryStr = '$day.$month.$year $hour:$minute';
+    }
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: const Icon(Icons.mark_email_read_rounded, color: vibrantBlue, size: 48),
+        title: Text(
+          'Yeni Davet Kodu Oluşturuldu',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Eski davet kodu geçersiz kılındı. Kiracınız sisteme kaydolurken bu yeni kodu kullanmalıdır:',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: vibrantBlue.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(
+                      code,
+                      style: GoogleFonts.sourceCodePro(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: vibrantBlue,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 20, color: vibrantBlue),
+                    tooltip: 'Kodu Kopyala',
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: code));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Davet kodu panoya kopyalandı!'),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            if (expiryStr.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.timer_outlined, size: 16, color: Colors.grey),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Son Kullanma: $expiryStr',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Kapat', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: code));
+              Navigator.pop(dialogCtx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Davet kodu kopyalandı!'),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('Kopyala'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: vibrantBlue,
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadAllData() async {
@@ -979,12 +1157,20 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(
-          widget.property.name,
+          _currentProperty.name,
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.bold,
             color: textColor,
           ),
         ),
+        actions: [
+          if (isLandlord)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, color: vibrantBlue),
+              tooltip: 'Mülkü Düzenle',
+              onPressed: _onEditProperty,
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -1022,7 +1208,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      widget.property.name,
+                                      _currentProperty.name,
                                       style: GoogleFonts.poppins(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -1031,7 +1217,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Mülk Detayları',
+                                      _currentProperty.city != null && _currentProperty.city!.isNotEmpty
+                                          ? 'Mülk Detayları • ${_currentProperty.city}'
+                                          : 'Mülk Detayları',
                                       style: GoogleFonts.inter(
                                         fontSize: 13,
                                         color: textSecondary,
@@ -1040,6 +1228,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                   ],
                                 ),
                               ),
+                              if (isLandlord)
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 20, color: vibrantBlue),
+                                  tooltip: 'Düzenle',
+                                  onPressed: _onEditProperty,
+                                ),
                             ],
                           ),
                           const SizedBox(height: 16),
@@ -1064,8 +1258,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      widget.property.address.isNotEmpty
-                                          ? widget.property.address
+                                      _currentProperty.address.isNotEmpty
+                                          ? _currentProperty.address
                                           : 'Adres belirtilmemiş',
                                       style: GoogleFonts.inter(
                                         fontSize: 14,
@@ -1287,6 +1481,146 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                             ),
                                           ],
                                         ),
+
+                                        // Davet Kodu ve Durumu Bölümü (Kiracı henüz bağlanmamışken)
+                                        if (lease.canRegenerateInvite || (lease.inviteCode != null && lease.inviteCode!.isNotEmpty)) ...[
+                                          const SizedBox(height: 12),
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: lease.isInviteExpired
+                                                    ? Colors.red.withValues(alpha: 0.5)
+                                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                                              ),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.vpn_key_outlined,
+                                                          size: 16,
+                                                          color: lease.isInviteExpired ? Colors.red : vibrantBlue,
+                                                        ),
+                                                        const SizedBox(width: 6),
+                                                        Text(
+                                                          'Kiracı Davet Kodu',
+                                                          style: GoogleFonts.inter(
+                                                            fontSize: 12,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: lease.isInviteExpired ? Colors.red : textColor,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    if (lease.isInviteExpired)
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.red.withValues(alpha: 0.15),
+                                                          borderRadius: BorderRadius.circular(6),
+                                                        ),
+                                                        child: const Text(
+                                                          'Süresi Dolmuş',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      )
+                                                    else if (lease.inviteCodeExpiresAt != null)
+                                                      Text(
+                                                        'Son: ${lease.inviteCodeExpiresAt!.day.toString().padLeft(2, '0')}.${lease.inviteCodeExpiresAt!.month.toString().padLeft(2, '0')}.${lease.inviteCodeExpiresAt!.year}',
+                                                        style: GoogleFonts.inter(fontSize: 11, color: textSecondary),
+                                                      ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: SelectableText(
+                                                        lease.inviteCode ?? 'Kod oluşturulmamış',
+                                                        style: GoogleFonts.sourceCodePro(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: lease.isInviteExpired ? Colors.grey : (isDark ? Colors.white : darkNavy),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (lease.inviteCode != null && lease.inviteCode!.isNotEmpty)
+                                                      IconButton(
+                                                        icon: const Icon(Icons.copy, size: 18, color: vibrantBlue),
+                                                        tooltip: 'Kopyala',
+                                                        padding: EdgeInsets.zero,
+                                                        constraints: const BoxConstraints(),
+                                                        onPressed: () {
+                                                          Clipboard.setData(ClipboardData(text: lease.inviteCode!));
+                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                            const SnackBar(
+                                                              content: Text('Davet kodu panoya kopyalandı!'),
+                                                              backgroundColor: Colors.green,
+                                                              behavior: SnackBarBehavior.floating,
+                                                              duration: Duration(seconds: 2),
+                                                            ),
+                                                          );
+                                                        },
+                                                      ),
+                                                  ],
+                                                ),
+                                                if (lease.isInviteExpired) ...[
+                                                  const SizedBox(height: 6),
+                                                  Text(
+                                                    '⚠️ Davet kodunun süresi dolmuş. Kiracı bu kodla giriş yapamaz. Lütfen yeni kod oluşturun.',
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 11.5,
+                                                      color: Colors.red.shade700,
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                                if (isLandlord && lease.canRegenerateInvite) ...[
+                                                  const SizedBox(height: 10),
+                                                  SizedBox(
+                                                    width: double.infinity,
+                                                    height: 36,
+                                                    child: OutlinedButton.icon(
+                                                      onPressed: _regeneratingLeaseId == lease.id
+                                                          ? null
+                                                          : () => _regenerateInviteCode(lease),
+                                                      icon: _regeneratingLeaseId == lease.id
+                                                          ? const SizedBox(
+                                                              width: 14,
+                                                              height: 14,
+                                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                                            )
+                                                          : const Icon(Icons.refresh, size: 16),
+                                                      label: Text(
+                                                        _regeneratingLeaseId == lease.id
+                                                            ? 'Yenileniyor...'
+                                                            : 'Yeni Davet Kodu Oluştur',
+                                                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                                                      ),
+                                                      style: OutlinedButton.styleFrom(
+                                                        foregroundColor: vibrantBlue,
+                                                        side: const BorderSide(color: vibrantBlue),
+                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                        ],
 
                                         // Item 3: Landlord Approval Actions for Pending Leases
                                         if (isPendingApproval && isLandlord) ...[
