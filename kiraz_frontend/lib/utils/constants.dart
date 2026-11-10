@@ -1,4 +1,6 @@
 class ApiConstants {
-  // Live demo ngrok tunnel URL
-  static const String baseUrl = 'https://astride-discharge-fernlike.ngrok-free.dev/api';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:8080/api',
+  );
 }

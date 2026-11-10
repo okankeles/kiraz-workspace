@@ -1,7 +1,7 @@
+import '../../utils/file_viewer.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/lease.dart';
 import '../../models/payment_summary.dart';
@@ -525,14 +525,13 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: () async {
+              onPressed: () {
                 Navigator.pop(dialogCtx);
-                final uri = Uri.parse(url);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                } else {
-                  await launchUrl(uri);
-                }
+                FileViewer.open(
+                  context: context,
+                  fileUrl: url,
+                  title: 'Dekont Belgesi',
+                );
               },
               icon: const Icon(Icons.open_in_new_rounded, size: 18),
               label: const Text('Dekont Belgesini Aç'),

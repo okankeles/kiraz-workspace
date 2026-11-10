@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/receipt_approval_item.dart';
 import '../../services/landlord_service.dart';
 import '../../utils/constants.dart';
+import '../../utils/file_viewer.dart';
+import '../../widgets/authenticated_image.dart';
 
 class ReceiptApprovalsScreen extends StatefulWidget {
   const ReceiptApprovalsScreen({super.key});
@@ -260,43 +261,10 @@ class _ReceiptApprovalsScreenState extends State<ReceiptApprovalsScreen> {
 
   // --- TAM EKRAN GÖRSEL ZOOM DİALOGU ---
   void _openFullScreenImage(String imageUrl) {
-    showDialog(
+    FileViewer.open(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.black87,
-        insetPadding: const EdgeInsets.all(12),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            InteractiveViewer(
-              panEnabled: true,
-              minScale: 0.8,
-              maxScale: 4.0,
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.contain,
-                loadingBuilder: (_, child, progress) {
-                  if (progress == null) return child;
-                  return const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => const Center(
-                  child: Text('Görsel yüklenemedi', style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                onPressed: () => Navigator.pop(ctx),
-              ),
-            ),
-          ],
-        ),
-      ),
+      fileUrl: imageUrl,
+      title: 'Dekont Görseli',
     );
   }
 
@@ -505,12 +473,11 @@ class _ReceiptApprovalsScreenState extends State<ReceiptApprovalsScreen> {
                                       ),
                                       const SizedBox(height: 16),
                                       ElevatedButton.icon(
-                                        onPressed: () async {
-                                          final uri = Uri.parse(fullUrl);
-                                          if (await canLaunchUrl(uri)) {
-                                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                          }
-                                        },
+                                        onPressed: () => FileViewer.open(
+                                          context: context,
+                                          fileUrl: fullUrl,
+                                          title: 'Dekont Belgesi',
+                                        ),
                                         icon: const Icon(Icons.open_in_new_rounded, size: 16),
                                         label: const Text('PDF Belgesini Aç'),
                                         style: ElevatedButton.styleFrom(
@@ -528,30 +495,10 @@ class _ReceiptApprovalsScreenState extends State<ReceiptApprovalsScreen> {
                                   child: Stack(
                                     alignment: Alignment.center,
                                     children: [
-                                      Image.network(
-                                        fullUrl,
+                                      AuthenticatedImage(
+                                        imageUrl: fullUrl,
                                         fit: BoxFit.contain,
                                         width: double.infinity,
-                                        loadingBuilder: (_, child, progress) {
-                                          if (progress == null) return child;
-                                          return const Center(
-                                            child: CircularProgressIndicator(color: vibrantBlue),
-                                          );
-                                        },
-                                        errorBuilder: (context, error, stackTrace) => Padding(
-                                          padding: const EdgeInsets.all(32.0),
-                                          child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              const Icon(Icons.broken_image_rounded, size: 48, color: Colors.grey),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                'Görsel yüklenemedi',
-                                                style: GoogleFonts.inter(color: Colors.grey, fontSize: 13),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
                                       ),
                                       Positioned(
                                         bottom: 10,

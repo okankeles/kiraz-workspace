@@ -1,8 +1,9 @@
+import '../../utils/file_viewer.dart';
+import '../../widgets/authenticated_image.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../main.dart';
 import '../../models/dashboard_stats.dart';
@@ -1566,24 +1567,11 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                                     ),
                                     const SizedBox(height: 18),
                                     ElevatedButton.icon(
-                                      onPressed: () async {
-                                        try {
-                                          final uri = Uri.parse(fullImageUrl);
-                                          if (await canLaunchUrl(uri)) {
-                                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                          } else {
-                                            await launchUrl(uri);
-                                          }
-                                        } catch (e) {
-                                          if (!dialogContext.mounted) return;
-                                          ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Dosya açılamadı: $e'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                        }
-                                      },
+                                      onPressed: () => FileViewer.open(
+                                        context: dialogContext,
+                                        fileUrl: fullImageUrl,
+                                        title: 'Dekont Belgesi',
+                                      ),
                                       icon: const Icon(Icons.open_in_new, size: 18),
                                       label: const Text('PDF Olarak İndir/Görüntüle'),
                                       style: ElevatedButton.styleFrom(
@@ -1599,40 +1587,9 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
                                   ],
                                 ),
                               )
-                            : Image.network(
-                                fullImageUrl,
+                            : AuthenticatedImage(
+                                imageUrl: fullImageUrl,
                                 fit: BoxFit.contain,
-                                loadingBuilder: (context, child, progress) {
-                                  if (progress == null) return child;
-                                  return SizedBox(
-                                    height: 200,
-                                    child: Center(
-                                      child: CircularProgressIndicator(
-                                        value: progress.expectedTotalBytes != null
-                                            ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                            : null,
-                                        color: vibrantBlue,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 160,
-                                    alignment: Alignment.center,
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.broken_image_outlined, size: 40, color: Colors.grey),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Dekont görseli yüklenemedi',
-                                          style: GoogleFonts.inter(fontSize: 12, color: Colors.grey),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
                               ),
                         ),
                       ),

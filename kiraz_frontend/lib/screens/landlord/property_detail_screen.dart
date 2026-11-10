@@ -1,17 +1,16 @@
+import '../../utils/file_viewer.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/lease.dart';
 import '../../models/property.dart';
 import '../../models/property_delegation.dart';
 import '../../services/delegation_service.dart';
 import '../../services/lease_service.dart';
-import '../../utils/constants.dart';
 import '../tenant/rent_period_list_screen.dart';
 import 'assign_tenant_screen.dart';
 
@@ -55,7 +54,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     _currentUserId = prefs.getInt('userId');
 
     try {
-      final results = await Future.wait([
+      final results = await Future.wait<dynamic>([
         _leaseService.getLeasesForProperty(widget.property.id).catchError((_) => <Lease>[]),
         _delegationService.getDelegationsForProperty(widget.property.id).catchError((_) => <PropertyDelegation>[]),
       ]);
@@ -119,28 +118,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   }
 
   Future<void> _viewContract(String rawUrl) async {
-    try {
-      String url = rawUrl;
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        final prefix = url.startsWith('/') ? '' : '/';
-        url = '${ApiConstants.baseUrl}$prefix$url';
-      }
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sözleşme açılamadı: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    await FileViewer.open(
+      context: context,
+      fileUrl: rawUrl,
+      title: 'Kira Sözleşmesi',
+    );
   }
 
   Future<void> _onAssignTenant() async {

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../main.dart';
+import '../../services/auth_service.dart';
 import '../auth/login_screen.dart';
 import '../landlord/delegations_screen.dart';
 import '../landlord/receipt_approvals_screen.dart';
@@ -89,11 +90,7 @@ class _MenuScreenState extends State<MenuScreen> {
     );
 
     if (confirmed == true) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('userId');
-      await prefs.remove('role');
-      await prefs.remove('fullName');
-      await prefs.remove('token');
+      await AuthService().logout();
 
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(

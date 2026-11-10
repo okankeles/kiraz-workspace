@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/auth_service.dart';
 import '../agent/agent_dashboard_screen.dart';
 import '../auth/login_screen.dart';
 import '../manager/manager_dashboard_screen.dart';
@@ -39,8 +40,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await AuthService().logout();
 
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(

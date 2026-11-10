@@ -1,93 +1,71 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/property.dart';
-import '../utils/constants.dart';
+import 'api_client.dart';
 
 class PropertyService {
-  Future<Map<String, String>> _getHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('userId');
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
-    if (userId != null) {
-      headers['X-User-Id'] = userId.toString();
-      headers['Authorization'] = 'Bearer $userId';
-    }
-    return headers;
-  }
+  final ApiClient _apiClient;
 
+  PropertyService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient.instance;
+
+  /// Ev sahibinin mülk listesini çeker.
+  /// GET /api/landlord/properties
   Future<List<Property>> getProperties({int? landlordId}) async {
-    int? targetLandlordId = landlordId;
-    if (targetLandlordId == null) {
-      final prefs = await SharedPreferences.getInstance();
-      targetLandlordId = prefs.getInt('userId');
+    final uri = _apiClient.resolveUri('/landlord/properties');
+    final response = await _apiClient.get(uri);
+
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((item) => Property.fromJson(item))
+          .toList();
     }
-
-    final url = targetLandlordId != null
-        ? Uri.parse('${ApiConstants.baseUrl}/properties?landlordId=$targetLandlordId')
-        : Uri.parse('${ApiConstants.baseUrl}/properties');
-
-    final headers = await _getHeaders();
-
-    try {
-      final response = await http.get(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        if (data is List) {
-          return data
-              .map((item) => Property.fromJson(item as Map<String, dynamic>))
-              .toList();
-        }
-        return [];
-      } else {
-        throw Exception('Mülkler yüklenemedi: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Mülk listesi alınırken hata oluştu: $e');
-    }
+    return [];
   }
 
-  Future<List<Property>> getPropertiesForAgent(int agentId) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/properties/agent/$agentId');
-    final headers = await _getHeaders();
+  /// Emlakçı / Mülk Yöneticisi için atanan mülkleri çeker.
+  /// GET /api/manager/properties
+  Future<List<Property>> getPropertiesForAgent([int? agentId]) async {
+    final uri = _apiClient.resolveUri('/manager/properties');
+    final response = await _apiClient.get(uri);
 
-    try {
-      final response = await http.get(url, headers: headers);
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        if (data is List) {
-          return data
-              .map((item) => Property.fromJson(item as Map<String, dynamic>))
-              .toList();
-        }
-        return [];
-      } else {
-        throw Exception('Emlakçı mülkleri yüklenemedi: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Emlakçı mülkleri alınırken hata oluştu: $e');
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((item) => Property.fromJson(item))
+          .toList();
     }
+    return [];
   }
 
+  /// Belirli bir mülkün detayını çeker.
+  /// GET /api/properties/{id}
+  Future<Property> getPropertyById(int propertyId) async {
+    final uri = _apiClient.resolveUri('/properties/$propertyId');
+    final response = await _apiClient.get(uri);
+
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    return Property.fromJson(data as Map<String, dynamic>);
+  }
+
+  /// Yeni mülk ekler (Yalnızca LANDLORD).
+  /// POST /api/properties
   Future<Property> createProperty(
     String title,
     String address,
     String city,
-    int landlordId, {
+    int? landlordId, {
     String? daskEndDate,
     double? depositAmount,
   }) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/properties');
+    final uri = _apiClient.resolveUri('/properties');
 
     final Map<String, dynamic> payload = {
       'title': title,
+      'name': title,
       'address': address,
       'city': city,
-      'landlordId': landlordId,
     };
     if (daskEndDate != null && daskEndDate.isNotEmpty) {
       payload['daskEndDate'] = daskEndDate;
@@ -96,24 +74,38 @@ class PropertyService {
       payload['depositAmount'] = depositAmount;
     }
 
-    final headers = await _getHeaders();
+    final response = await _apiClient.post(uri, body: payload);
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    return Property.fromJson(data as Map<String, dynamic>);
+  }
 
-    final http.Response response;
-    try {
-      response = await http.post(
-        url,
-        headers: headers,
-        body: json.encode(payload),
-      );
-    } catch (e) {
-      throw Exception('Bağlantı hatası: $e');
+  /// Mülk bilgilerini günceller.
+  /// PUT /api/properties/{id}
+  Future<Property> updateProperty(
+    int id,
+    String title,
+    String address,
+    String city, {
+    String? daskEndDate,
+    double? depositAmount,
+  }) async {
+    final uri = _apiClient.resolveUri('/properties/$id');
+
+    final Map<String, dynamic> payload = {
+      'title': title,
+      'name': title,
+      'address': address,
+      'city': city,
+    };
+    if (daskEndDate != null && daskEndDate.isNotEmpty) {
+      payload['daskEndDate'] = daskEndDate;
+    }
+    if (depositAmount != null) {
+      payload['depositAmount'] = depositAmount;
     }
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-      return Property.fromJson(data as Map<String, dynamic>);
-    } else {
-      throw Exception('Mülk eklenemedi: ${response.statusCode}');
-    }
+    final response = await _apiClient.put(uri, body: payload);
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    return Property.fromJson(data as Map<String, dynamic>);
   }
 }

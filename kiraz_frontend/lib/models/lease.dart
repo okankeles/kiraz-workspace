@@ -20,6 +20,7 @@ class Lease {
   final String? landlordName;
   final String? landlordEmail;
   final String? endDate;
+  final bool? landlordApproved;
 
   Lease({
     required this.id,
@@ -43,16 +44,24 @@ class Lease {
     this.landlordName,
     this.landlordEmail,
     this.endDate,
+    this.landlordApproved,
   });
 
   bool get isPendingLandlordApproval =>
-      approvalStatus?.toUpperCase() == 'PENDING_LANDLORD_APPROVAL';
+      approvalStatus?.toUpperCase() == 'PENDING_LANDLORD_APPROVAL' ||
+      landlordApproved == false;
 
   bool get isRejected => approvalStatus?.toUpperCase() == 'REJECTED';
 
+  bool get hasLandlordApproval {
+    if (landlordApproved != null) return landlordApproved!;
+    if (isPendingLandlordApproval || isRejected) return false;
+    return true;
+  }
+
   bool get isApprovedOrActive =>
       approvalStatus?.toUpperCase() == 'ACTIVE' ||
-      (status?.toUpperCase() == 'ACTIVE' && !isPendingLandlordApproval);
+      (status?.toUpperCase() == 'ACTIVE' && hasLandlordApproval);
 
   String get approvalStatusDisplay {
     switch (approvalStatus?.toUpperCase()) {
@@ -151,6 +160,13 @@ class Lease {
       landlordName: lName,
       landlordEmail: lEmail,
       endDate: json['endDate']?.toString() ?? json['contractEndDate']?.toString(),
+      landlordApproved: json['landlordApproved'] is bool
+          ? json['landlordApproved'] as bool
+          : (json['approvalStatus'] == 'PENDING_LANDLORD_APPROVAL'
+              ? false
+              : (json['approvalStatus'] == 'APPROVED' || json['approvalStatus'] == 'ACTIVE'
+                  ? true
+                  : null)),
     );
   }
 }

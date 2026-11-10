@@ -1,70 +1,52 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../models/notification_model.dart';
-import '../utils/constants.dart';
+import 'api_client.dart';
 
 class NotificationService {
-  Future<List<AppNotification>> getUnreadNotifications(int userId) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/notifications?userId=$userId');
+  final ApiClient _apiClient;
 
-    try {
-      final response = await http.get(
-        url,
-        headers: {'Content-Type': 'application/json'},
-      );
+  NotificationService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient.instance;
 
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        if (data is List) {
-          return data
-              .map((item) => AppNotification.fromJson(item as Map<String, dynamic>))
-              .toList();
-        }
-        return [];
-      } else {
-        throw Exception('Bildirimler yüklenemedi: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Bildirimler alınırken hata: $e');
+  /// Okunmamış bildirimleri çeker.
+  /// GET /api/notifications/unread
+  Future<List<AppNotification>> getUnreadNotifications([int? userId]) async {
+    final uri = _apiClient.resolveUri('/notifications/unread');
+    final response = await _apiClient.get(uri);
+
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((item) => AppNotification.fromJson(item))
+          .toList();
     }
+    return [];
   }
 
-  Future<List<AppNotification>> getAllNotifications(int userId) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/notifications/user/$userId/all');
+  /// Tüm bildirim geçmişini çeker.
+  /// GET /api/notifications/all
+  Future<List<AppNotification>> getAllNotifications([int? userId]) async {
+    final uri = _apiClient.resolveUri('/notifications/all');
+    final response = await _apiClient.get(uri);
 
-    try {
-      final response = await http.get(
-        url,
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final dynamic data = json.decode(utf8.decode(response.bodyBytes));
-        if (data is List) {
-          return data
-              .map((item) => AppNotification.fromJson(item as Map<String, dynamic>))
-              .toList();
-        }
-        return [];
-      } else {
-        throw Exception('Bildirim geçmişi yüklenemedi: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Bildirim geçmişi alınırken hata: $e');
+    final dynamic data = json.decode(utf8.decode(response.bodyBytes));
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((item) => AppNotification.fromJson(item))
+          .toList();
     }
+    return [];
   }
 
+  /// Bildirimi okundu olarak işaretler.
+  /// PUT /api/notifications/{id}/read
   Future<bool> markAsRead(int notificationId) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}/notifications/$notificationId/read');
-
+    final uri = _apiClient.resolveUri('/notifications/$notificationId/read');
     try {
-      final response = await http.put(
-        url,
-        headers: {'Content-Type': 'application/json'},
-      );
-
+      final response = await _apiClient.put(uri);
       return response.statusCode == 200;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }

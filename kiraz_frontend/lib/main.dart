@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
+import 'screens/auth/login_screen.dart';
 import 'screens/splash_screen.dart';
+import 'services/api_client.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  ApiClient.instance.onSessionExpired = () {
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  };
   runApp(const KirazApp());
 }
 
@@ -16,6 +26,7 @@ class KirazApp extends StatelessWidget {
       valueListenable: themeNotifier,
       builder: (context, currentMode, _) {
         return MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'KiraZ',
           debugShowCheckedModeBanner: false,
           themeMode: currentMode,

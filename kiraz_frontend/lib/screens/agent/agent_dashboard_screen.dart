@@ -7,6 +7,7 @@ import '../../models/dashboard_stats.dart';
 import '../../models/notification_model.dart';
 import '../../models/property.dart';
 import '../../models/property_delegation.dart';
+import '../../services/auth_service.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/delegation_service.dart';
 import '../../services/notification_service.dart';
@@ -101,8 +102,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   }
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await AuthService().logout();
 
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(

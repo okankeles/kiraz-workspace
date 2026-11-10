@@ -2,13 +2,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/lease.dart';
 import '../../models/rent_period.dart';
 import '../../services/payment_service.dart';
 import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
+import '../../utils/file_viewer.dart';
+import '../../widgets/authenticated_image.dart';
 import 'paytr_payment_screen.dart';
 
 class RentPeriodListScreen extends StatefulWidget {
@@ -557,24 +558,11 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                                   ),
                                   const SizedBox(height: 18),
                                   ElevatedButton.icon(
-                                    onPressed: () async {
-                                      try {
-                                        final uri = Uri.parse(fullImageUrl);
-                                        if (await canLaunchUrl(uri)) {
-                                          await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                        } else {
-                                          await launchUrl(uri);
-                                        }
-                                      } catch (e) {
-                                        if (!dialogContext.mounted) return;
-                                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Dosya açılamadı: $e'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    },
+                                    onPressed: () => FileViewer.open(
+                                      context: dialogContext,
+                                      fileUrl: fullImageUrl,
+                                      title: 'Dekont Belgesi',
+                                    ),
                                     icon: const Icon(Icons.open_in_new, size: 18),
                                     label: const Text('PDF Olarak İndir/Görüntüle'),
                                     style: ElevatedButton.styleFrom(
@@ -591,46 +579,9 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
                               ),
                             )
                           : (rawUrl.isNotEmpty
-                              ? Image.network(
-                                  fullImageUrl,
+                              ? AuthenticatedImage(
+                                  imageUrl: fullImageUrl,
                                   fit: BoxFit.contain,
-                                  loadingBuilder: (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    final total = loadingProgress.expectedTotalBytes;
-                                    final loaded = loadingProgress.cumulativeBytesLoaded;
-                                    return Container(
-                                      height: 200,
-                                      alignment: Alignment.center,
-                                      child: CircularProgressIndicator(
-                                        value: total != null ? loaded / total : null,
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      height: 160,
-                                      alignment: Alignment.center,
-                                      padding: const EdgeInsets.all(16),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.broken_image_outlined,
-                                            size: 40,
-                                            color: Colors.grey,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Görsel yüklenemedi',
-                                            style: TextStyle(
-                                              color: Colors.grey.shade600,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
                                 )
                               : const SizedBox(
                                   height: 120,
