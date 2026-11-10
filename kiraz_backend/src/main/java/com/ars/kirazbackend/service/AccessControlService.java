@@ -131,6 +131,28 @@ public class AccessControlService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public boolean canUpdateProperty(Long propertyId) {
+        User user = getCurrentUser();
+        if (user == null || propertyId == null) {
+            return false;
+        }
+        Property property = propertyRepository.findById(propertyId).orElse(null);
+        if (property == null) {
+            return false;
+        }
+        // Yalnızca mülkün sahibi olan ev sahibi güncelleyebilir
+        return user.getRole() == RoleType.LANDLORD
+                && property.getLandlord() != null
+                && property.getLandlord().getId().equals(user.getId());
+    }
+
+    public void checkCanUpdateProperty(Long propertyId) {
+        if (!canUpdateProperty(propertyId)) {
+            throw new ResourceNotFoundException("Kaynak bulunamadı: " + propertyId);
+        }
+    }
+
     // ==========================================
     // Lease Permissions
     // ==========================================
@@ -191,6 +213,17 @@ public class AccessControlService {
 
     public void checkCanApproveOrRejectLease(Long leaseId) {
         if (!canApproveOrRejectLease(leaseId)) {
+            throw new ResourceNotFoundException("Kaynak bulunamadı: " + leaseId);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canLandlordManageLease(Long leaseId) {
+        return canApproveOrRejectLease(leaseId);
+    }
+
+    public void checkCanLandlordManageLease(Long leaseId) {
+        if (!canLandlordManageLease(leaseId)) {
             throw new ResourceNotFoundException("Kaynak bulunamadı: " + leaseId);
         }
     }

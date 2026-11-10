@@ -21,5 +21,12 @@ public class PropertyRequest {
     private String city;
     private LocalDate daskEndDate;
     private BigDecimal depositAmount;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("name")
+    public void setName(String name) {
+        if (this.title == null || this.title.trim().isEmpty()) {
+            this.title = name;
+        }
+    }
 }
 

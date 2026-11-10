@@ -42,4 +42,16 @@ public class PropertyController {
         authz.checkCanViewProperty(id);
         return ResponseEntity.ok(propertyService.getPropertyById(id));
     }
+
+    @PutMapping("/{id:\\d+}")
+    @PreAuthorize("hasRole('LANDLORD')")
+    @Operation(summary = "Mülk bilgilerini güncelle (Kanonik)")
+    public ResponseEntity<Property> updateProperty(
+            @PathVariable Long id,
+            @RequestBody PropertyRequest request) {
+        authz.checkCanUpdateProperty(id);
+        User user = authz.getCurrentUser();
+        return ResponseEntity.ok(propertyService.updateProperty(id, request, user));
+    }
 }
+

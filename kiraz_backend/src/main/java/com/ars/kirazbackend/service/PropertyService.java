@@ -21,6 +21,7 @@ public class PropertyService {
     private final UserRepository userRepository;
     private final LeaseAgreementRepository leaseAgreementRepository;
     private final PropertyDelegationService propertyDelegationService;
+    private final AuditLogService auditLogService;
 
     public Property createProperty(PropertyRequest request) {
         User landlord = userRepository.findById(request.getLandlordId())
@@ -88,6 +89,39 @@ public class PropertyService {
                 .orElseThrow(() -> new com.ars.kirazbackend.exception.ResourceNotFoundException("Mülk bulunamadı: " + id));
         populateTenantInfo(property);
         return property;
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public Property updateProperty(Long id, PropertyRequest request, User user) {
+        if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
+            throw new IllegalArgumentException("Mülk başlığı zorunludur.");
+        }
+
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new com.ars.kirazbackend.exception.ResourceNotFoundException("Mülk bulunamadı: " + id));
+
+        // Gövdedeki landlordId gibi sahiplik alanları yok sayılır (değiştirilmez)
+        property.setTitle(request.getTitle().trim());
+        property.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
+        property.setCity(request.getCity() != null ? request.getCity().trim() : null);
+        property.setDaskEndDate(request.getDaskEndDate());
+
+        Property savedProperty = propertyRepository.save(property);
+        populateTenantInfo(savedProperty);
+
+        if (request.getDepositAmount() != null) {
+            savedProperty.setDepositAmount(request.getDepositAmount());
+        }
+
+        auditLogService.record(
+                "PROPERTY",
+                savedProperty.getId(),
+                "PROPERTY_UPDATED",
+                user,
+                String.format("Mülk bilgileri güncellendi: '%s' (ID: %d)", savedProperty.getTitle(), savedProperty.getId())
+        );
+
+        return savedProperty;
     }
 }
 
