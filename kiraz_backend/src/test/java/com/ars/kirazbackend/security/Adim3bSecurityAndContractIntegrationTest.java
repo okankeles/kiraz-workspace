@@ -149,8 +149,8 @@ public class Adim3bSecurityAndContractIntegrationTest {
                 .endDate(LocalDate.now().plusDays(30))
                 .build());
 
-        // 3. Dosya klasörü ve test dosyaları
-        Path uploadDir = Paths.get("uploads/receipts").toAbsolutePath().normalize();
+        // 3. Dosya klasörü ve test dosyaları (target/test-uploads içinde izole)
+        Path uploadDir = Paths.get("target/test-uploads/receipts").toAbsolutePath().normalize();
         Files.createDirectories(uploadDir);
 
         testReceiptPath = uploadDir.resolve("test_receipt_a.png");
@@ -482,6 +482,60 @@ public class Adim3bSecurityAndContractIntegrationTest {
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Çok fazla istek yapıldı")));
     }
 
+    @Test
+    void testInviteRateLimiting_DifferentXForwardedForFromUntrustedProxy_DoesNotBypassLimit_11thReturns429() throws Exception {
+        inviteRateLimitingFilter.resetForTesting();
+        String code = leaseA.getInviteCode();
+
+        // 10 istek her seferinde farklı bir X-Forwarded-For başlığıyla gönderiliyor ancak remoteAddr aynı
+        for (int i = 1; i <= 10; i++) {
+            mockMvc.perform(get("/api/leases/validate-invite")
+                            .param("inviteCode", code)
+                            .header("X-Forwarded-For", "203.0.113." + i)
+                            .with(request -> {
+                                request.setRemoteAddr("198.51.100.99");
+                                return request;
+                            }))
+                    .andExpect(status().isOk());
+        }
+
+        // 11. istekte yine farklı X-Forwarded-For olsa bile gerçek remoteAddr üzerinden 429 Too Many Requests dönmeli
+        mockMvc.perform(get("/api/leases/validate-invite")
+                        .param("inviteCode", code)
+                        .header("X-Forwarded-For", "203.0.113.99")
+                        .with(request -> {
+                            request.setRemoteAddr("198.51.100.99");
+                            return request;
+                        }))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.status").value(429));
+    }
+
+    @Test
+    void testLeaseActivation_DirectLandlordCreatedLease_StartsActiveApproval_TenantCanActivate200() throws Exception {
+        // Ev sahibi emlakçı olmadan doğrudan sözleşme oluşturduğunda approvalStatus=ACTIVE başlar
+        LeaseAgreement landlordDirectLease = leaseRepository.save(LeaseAgreement.builder()
+                .property(propertyA)
+                .tenant(tenantA)
+                .createdBy(landlordA)
+                .monthlyRentAmount(BigDecimal.valueOf(30000))
+                .status(LeaseStatus.PENDING)
+                .approvalStatus(LeaseApprovalStatus.ACTIVE)
+                .inviteCode(LeaseService.generateInviteCode())
+                .inviteCodeExpiresAt(LocalDateTime.now().plusDays(7))
+                .inviteCodeUsed(false)
+                .build());
+
+        String tenantToken = AuthTestHelper.generateValidToken(tenantA);
+
+        // Kiracı sözleşmeyi aktive ettiğinde 200 dönmeli
+        mockMvc.perform(put("/api/leases/" + landlordDirectLease.getId() + "/activate")
+                        .header("Authorization", "Bearer " + tenantToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.approvalStatus").value("ACTIVE"));
+    }
+
     // ==========================================
     // 5. Kanonik Uçlar ve Deprecated Uçlar Testleri
     // ==========================================
@@ -548,5 +602,16 @@ public class Adim3bSecurityAndContractIntegrationTest {
         propertyRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
+
+        try {
+            Path testUploads = Paths.get("target/test-uploads").toAbsolutePath().normalize();
+            if (Files.exists(testUploads)) {
+                try (var stream = Files.walk(testUploads)) {
+                    stream.sorted(java.util.Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(java.io.File::delete);
+                }
+            }
+        } catch (Exception ignored) {}
     }
 }

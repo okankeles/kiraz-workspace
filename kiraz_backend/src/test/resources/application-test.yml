@@ -65,3 +65,9 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+kiraz:
+  storage:
+    upload-dir: target/test-uploads
+  security:
+    trusted-proxies: ""

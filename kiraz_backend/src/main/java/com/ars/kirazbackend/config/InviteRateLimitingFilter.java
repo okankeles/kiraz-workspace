@@ -73,19 +73,37 @@ public class InviteRateLimitingFilter extends OncePerRequestFilter {
         response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 
+    @org.springframework.beans.factory.annotation.Value("${kiraz.security.trusted-proxies:}")
+    private String trustedProxiesConfig;
+
     public String resolveClientIp(HttpServletRequest request) {
-        String clientIp = request.getHeader("X-Forwarded-For");
-        if (clientIp != null && !clientIp.trim().isEmpty() && !"unknown".equalsIgnoreCase(clientIp)) {
-            if (clientIp.contains(",")) {
-                return clientIp.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+        if (isTrustedProxy(remoteAddr)) {
+            String clientIp = request.getHeader("X-Forwarded-For");
+            if (clientIp != null && !clientIp.trim().isEmpty() && !"unknown".equalsIgnoreCase(clientIp)) {
+                if (clientIp.contains(",")) {
+                    return clientIp.split(",")[0].trim();
+                }
+                return clientIp.trim();
             }
-            return clientIp.trim();
+            clientIp = request.getHeader("X-Real-IP");
+            if (clientIp != null && !clientIp.trim().isEmpty() && !"unknown".equalsIgnoreCase(clientIp)) {
+                return clientIp.trim();
+            }
         }
-        clientIp = request.getHeader("X-Real-IP");
-        if (clientIp != null && !clientIp.trim().isEmpty() && !"unknown".equalsIgnoreCase(clientIp)) {
-            return clientIp.trim();
+        return remoteAddr;
+    }
+
+    private boolean isTrustedProxy(String remoteAddr) {
+        if (remoteAddr == null || trustedProxiesConfig == null || trustedProxiesConfig.trim().isEmpty()) {
+            return false;
         }
-        return request.getRemoteAddr();
+        for (String trusted : trustedProxiesConfig.split(",")) {
+            if (trusted.trim().equalsIgnoreCase(remoteAddr.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void resetForTesting() {

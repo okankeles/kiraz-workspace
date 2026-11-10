@@ -77,4 +77,8 @@ springdoc:
 kiraz:
   dev:
     smtp-verify: false
+  storage:
+    upload-dir: ${UPLOAD_DIR:uploads}
+  security:
+    trusted-proxies: ${TRUSTED_PROXIES:}
 

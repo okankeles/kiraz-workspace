@@ -39,3 +39,6 @@ build/
 
 ### Uploads ###
 uploads/
+
+### Backups ###
+backups/
