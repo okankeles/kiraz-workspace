@@ -8,6 +8,8 @@ import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.PayTrService;
 import com.ars.kirazbackend.service.RentPeriodService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
+@Tag(name = "Payments", description = "Ödeme ve tahsilat uçları")
 public class PaymentController {
 
     private final PayTrService payTrService;
@@ -30,10 +33,11 @@ public class PaymentController {
     private final AccessControlService authz;
 
     /**
-     * Kiracının belirli bir kira periyodu için PayTR Token talep ettiği endpoint.
+     * Kiracının belirli bir kira periyodu için PayTR Token talep ettiği endpoint (Kanonik).
      */
     @PostMapping("/paytr/initialize")
     @PreAuthorize("hasRole('TENANT')")
+    @Operation(summary = "PayTR iFrame token al (Kanonik)")
     public ResponseEntity<PayTrInitResponse> initializePayTr(
             @RequestBody @Valid PayTrInitRequest request,
             HttpServletRequest servletRequest) {
@@ -49,10 +53,11 @@ public class PaymentController {
     }
 
     /**
-     * PayTR'ın ödeme sonucunu POST ettiği asenkron webhook endpoint'i.
+     * PayTR'ın ödeme sonucunu POST ettiği asenkron webhook endpoint'i (Kanonik).
      * PayTR panelinde kayıtlı resmi tek endpoint /api/payments/paytr-callback'tir.
      */
     @PostMapping(value = "/paytr-callback", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
+    @Operation(summary = "PayTR webhook callback (Kanonik)")
     public ResponseEntity<String> payTrCallback(@RequestParam MultiValueMap<String, String> payload) {
         log.info("PayTR Callback webhook isteği alındı: oid={}", payload.getFirst("merchant_oid"));
         String response = payTrService.processCallback(payload);
@@ -60,10 +65,12 @@ public class PaymentController {
     }
 
     /**
-     * Kiracının Havale/EFT dekontu yüklediği endpoint.
+     * Kiracının Havale/EFT dekontu yüklediği endpoint (Deprecated - yerine POST /api/tenant/receipts/{periodId} kullanın).
      */
+    @Deprecated
     @PostMapping(value = "/{periodId}/receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('TENANT')")
+    @Operation(summary = "Havale/EFT dekontu yükle (Deprecated - yerine POST /api/tenant/receipts/{periodId} kullanın)", deprecated = true)
     public ResponseEntity<RentPeriod> uploadReceipt(
             @PathVariable Long periodId,
             @RequestParam("file") MultipartFile file) {
@@ -76,10 +83,12 @@ public class PaymentController {
     }
 
     /**
-     * Kiracının anlık finansal özetini (Toplam Borç, Toplam Ödenen, Sıradaki Ödeme) döner.
+     * Kiracının anlık finansal özetini döner (Deprecated - yerine GET /api/tenant/payments/summary kullanın).
      */
+    @Deprecated
     @GetMapping("/summary")
     @PreAuthorize("hasRole('TENANT')")
+    @Operation(summary = "Kiracı ödeme özeti (Deprecated - yerine GET /api/tenant/payments/summary kullanın)", deprecated = true)
     public ResponseEntity<PaymentSummaryResponse> getPaymentSummary() {
         User user = authz.getCurrentUser();
         if (user == null || user.getId() == null) {

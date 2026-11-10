@@ -4,6 +4,8 @@ import com.ars.kirazbackend.entity.AuditLog;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.AuditLogService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/audit-logs")
 @RequiredArgsConstructor
+@Tag(name = "Audit Logs", description = "Denetim izi ve işlem logları uçları")
 public class AuditLogController {
 
     private final AuditLogService auditLogService;
@@ -22,6 +25,7 @@ public class AuditLogController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER')")
+    @Operation(summary = "Varlığa ait denetim loglarını listele (Kanonik)")
     public ResponseEntity<List<AuditLog>> getLogs(
             @RequestParam String entityName,
             @RequestParam Long entityId) {
@@ -31,6 +35,7 @@ public class AuditLogController {
 
     @GetMapping("/my-logs")
     @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
+    @Operation(summary = "Oturum açan kullanıcının işlem loglarını listele (Kanonik)")
     public ResponseEntity<List<AuditLog>> getMyLogs() {
         User user = authz.getCurrentUser();
         if (user == null || user.getId() == null) {
@@ -39,8 +44,10 @@ public class AuditLogController {
         return ResponseEntity.ok(auditLogService.getLogsForUser(user.getId()));
     }
 
+    @Deprecated
     @GetMapping("/user")
     @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
+    @Operation(summary = "Kullanıcı logları (Deprecated - yerine GET /api/audit-logs/my-logs kullanın)", deprecated = true)
     public ResponseEntity<List<AuditLog>> getUserLogs() {
         return getMyLogs();
     }
