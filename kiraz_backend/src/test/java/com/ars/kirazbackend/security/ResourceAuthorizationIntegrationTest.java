@@ -63,6 +63,9 @@ public class ResourceAuthorizationIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
+    private AuditLogRepository auditLogRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @MockitoBean
@@ -95,6 +98,7 @@ public class ResourceAuthorizationIntegrationTest {
         leaseRepository.deleteAll();
         propertyRepository.deleteAll();
         refreshTokenRepository.deleteAll();
+        auditLogRepository.deleteAll();
         userRepository.deleteAll();
 
         // 1. Users
@@ -585,5 +589,163 @@ public class ResourceAuthorizationIntegrationTest {
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/audit-logs/user").header("Authorization", "Bearer " + landlordToken))
                 .andExpect(status().isNotFound());
+
+        // 7. Dual endpoint removal: GET /api/leases/{leaseId}/periods was deleted (canonical is /api/periods/lease/{leaseId})
+        mockMvc.perform(get("/api/leases/" + leaseA.getId() + "/periods").header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isNotFound());
+        // Canonical endpoint still works
+        mockMvc.perform(get("/api/periods/lease/" + leaseA.getId()).header("Authorization", "Bearer " + landlordToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testUpdateProperty_Owner_Success_And_Unauthorized() throws Exception {
+        String landlordAToken = AuthTestHelper.generateValidToken(landlordA);
+        String landlordBToken = AuthTestHelper.generateValidToken(landlordB);
+        String agentToken = AuthTestHelper.generateValidToken(agentValid);
+        String tenantToken = AuthTestHelper.generateValidToken(tenantA);
+
+        String validUpdateJson = """
+                {
+                    "title": "Moda 3+1 Daire (Güncellendi)",
+                    "address": "Kadıköy Moda Caddesi No: 42",
+                    "city": "İstanbul",
+                    "daskEndDate": "2027-06-30",
+                    "depositAmount": 25000.0,
+                    "landlordId": %d
+                }
+                """.formatted(landlordB.getId());
+
+        // 1. Sahibi olan ev sahibi (landlordA) başarılı günceller (200 OK)
+        mockMvc.perform(put("/api/properties/" + propertyA.getId())
+                        .header("Authorization", "Bearer " + landlordAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(propertyA.getId()))
+                .andExpect(jsonPath("$.title").value("Moda 3+1 Daire (Güncellendi)"))
+                .andExpect(jsonPath("$.address").value("Kadıköy Moda Caddesi No: 42"))
+                .andExpect(jsonPath("$.city").value("İstanbul"))
+                .andExpect(jsonPath("$.daskEndDate").value("2027-06-30"));
+
+        // Veritabanında sahipliğin değişmediğini doğrula
+        Property updatedProperty = propertyRepository.findById(propertyA.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(landlordA.getId(), updatedProperty.getLandlord().getId());
+        org.junit.jupiter.api.Assertions.assertEquals("Moda 3+1 Daire (Güncellendi)", updatedProperty.getTitle());
+
+        // Audit log kaydı kontrolü
+        java.util.List<AuditLog> propertyLogs = auditLogRepository.findByEntityNameAndEntityIdOrderByCreatedAtDesc("PROPERTY", propertyA.getId());
+        org.junit.jupiter.api.Assertions.assertFalse(propertyLogs.isEmpty());
+        org.junit.jupiter.api.Assertions.assertEquals("PROPERTY_UPDATED", propertyLogs.get(0).getAction());
+
+        // 2. Başka ev sahibi (landlordB) güncelleyemez -> 404 Not Found
+        mockMvc.perform(put("/api/properties/" + propertyA.getId())
+                        .header("Authorization", "Bearer " + landlordBToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateJson))
+                .andExpect(status().isNotFound());
+
+        // 3. Emlakçı güncelleyemez -> 403 Forbidden
+        mockMvc.perform(put("/api/properties/" + propertyA.getId())
+                        .header("Authorization", "Bearer " + agentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateJson))
+                .andExpect(status().isForbidden());
+
+        // 4. Kiracı güncelleyemez -> 403 Forbidden
+        mockMvc.perform(put("/api/properties/" + propertyA.getId())
+                        .header("Authorization", "Bearer " + tenantToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateJson))
+                .andExpect(status().isForbidden());
+
+        // 5. Geçersiz gövde (boş başlık) -> 400 Bad Request
+        String invalidRequestJson = """
+                {
+                    "title": "   ",
+                    "address": "Adres"
+                }
+                """;
+        mockMvc.perform(put("/api/properties/" + propertyA.getId())
+                        .header("Authorization", "Bearer " + landlordAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidRequestJson))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testRegenerateInviteCode_Lifecycle_And_Authorization() throws Exception {
+        String landlordAToken = AuthTestHelper.generateValidToken(landlordA);
+        String landlordBToken = AuthTestHelper.generateValidToken(landlordB);
+        String agentToken = AuthTestHelper.generateValidToken(agentValid);
+        String tenantToken = AuthTestHelper.generateValidToken(tenantA);
+
+        // Henüz kabul edilmemiş, beklemede bir sözleşme oluşturalım
+        String oldCode = "ARS-OLD1234567890ABCDEF";
+        LeaseAgreement pendingLease = leaseRepository.save(LeaseAgreement.builder()
+                .property(propertyA)
+                .tenant(tenantA)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusYears(1))
+                .monthlyRentAmount(BigDecimal.valueOf(18000))
+                .paymentDay(5)
+                .status(LeaseStatus.PENDING)
+                .approvalStatus(LeaseApprovalStatus.ACTIVE)
+                .inviteCode(oldCode)
+                .inviteCodeExpiresAt(java.time.LocalDateTime.now().minusDays(1)) // Süresi dolmuş
+                .inviteCodeUsed(false)
+                .build());
+
+        // 1. Başka ev sahibi yenileyemez -> 404 Not Found
+        mockMvc.perform(post("/api/landlord/leases/" + pendingLease.getId() + "/regenerate-invite")
+                        .header("Authorization", "Bearer " + landlordBToken))
+                .andExpect(status().isNotFound());
+
+        // 2. Emlakçı ve kiracı yenileyemez -> 403 Forbidden
+        mockMvc.perform(post("/api/landlord/leases/" + pendingLease.getId() + "/regenerate-invite")
+                        .header("Authorization", "Bearer " + agentToken))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/landlord/leases/" + pendingLease.getId() + "/regenerate-invite")
+                        .header("Authorization", "Bearer " + tenantToken))
+                .andExpect(status().isForbidden());
+
+        // 3. Mülk sahibi (landlordA) başarılı bir şekilde davet kodunu yeniler (200 OK)
+        String responseContent = mockMvc.perform(post("/api/landlord/leases/" + pendingLease.getId() + "/regenerate-invite")
+                        .header("Authorization", "Bearer " + landlordAToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leaseId").value(pendingLease.getId()))
+                .andExpect(jsonPath("$.inviteCode").value(org.hamcrest.Matchers.startsWith("ARS-")))
+                .andExpect(jsonPath("$.inviteCodeExpiresAt").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+
+        com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(responseContent);
+        String newCode = rootNode.get("inviteCode").asText();
+        org.junit.jupiter.api.Assertions.assertNotEquals(oldCode, newCode);
+        org.junit.jupiter.api.Assertions.assertTrue(newCode.length() > 20, "128-bit hex kod 32 karakter + ARS- öneki olmalı");
+
+        // 4. Eski davet kodu artık reddedilmeli (404 Not Found)
+        mockMvc.perform(get("/api/leases/validate-invite").param("inviteCode", oldCode))
+                .andExpect(status().isNotFound());
+
+        // 5. Yeni davet kodu doğrulanabilmeli (200 OK)
+        mockMvc.perform(get("/api/leases/validate-invite").param("inviteCode", newCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leaseId").value(pendingLease.getId()))
+                .andExpect(jsonPath("$.message").value("Davet kodu geçerli"));
+
+        // Audit log kaydı kontrolü
+        java.util.List<AuditLog> leaseLogs = auditLogRepository.findByEntityNameAndEntityIdOrderByCreatedAtDesc("LEASE_AGREEMENT", pendingLease.getId());
+        org.junit.jupiter.api.Assertions.assertFalse(leaseLogs.isEmpty());
+        org.junit.jupiter.api.Assertions.assertEquals("INVITE_CODE_REGENERATED", leaseLogs.get(0).getAction());
+
+        // 6. Kabul edilmiş / kiracı bağlanmış sözleşmede tekrar yenileme denenirse 409 Conflict
+        LeaseAgreement reloadedLease = leaseRepository.findById(pendingLease.getId()).orElseThrow();
+        reloadedLease.setInviteCodeUsed(true);
+        reloadedLease.setStatus(LeaseStatus.ACTIVE);
+        leaseRepository.save(reloadedLease);
+
+        mockMvc.perform(post("/api/landlord/leases/" + pendingLease.getId() + "/regenerate-invite")
+                        .header("Authorization", "Bearer " + landlordAToken))
+                .andExpect(status().isConflict());
     }
 }

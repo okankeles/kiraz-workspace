@@ -3,12 +3,10 @@ package com.ars.kirazbackend.controller;
 import com.ars.kirazbackend.dto.InviteValidationResponse;
 import com.ars.kirazbackend.dto.LeaseRequest;
 import com.ars.kirazbackend.entity.LeaseAgreement;
-import com.ars.kirazbackend.entity.RentPeriod;
 import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.enums.RoleType;
 import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.LeaseService;
-import com.ars.kirazbackend.service.RentPeriodService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +25,6 @@ import java.util.List;
 public class LeaseController {
 
     private final LeaseService leaseService;
-    private final RentPeriodService rentPeriodService;
     private final AccessControlService authz;
 
     @PostMapping
@@ -85,15 +82,6 @@ public class LeaseController {
     public ResponseEntity<List<LeaseAgreement>> getLeasesForProperty(@PathVariable Long propertyId) {
         authz.checkCanViewProperty(propertyId);
         return ResponseEntity.ok(leaseService.getLeasesForProperty(propertyId));
-    }
-
-
-    @GetMapping("/{leaseId}/periods")
-    @PreAuthorize("hasAnyRole('LANDLORD', 'AGENT', 'PROPERTY_MANAGER', 'TENANT')")
-    @Operation(summary = "Sözleşmeye ait kira dönemlerini listele (Kanonik)")
-    public ResponseEntity<List<RentPeriod>> getRentPeriods(@PathVariable Long leaseId) {
-        authz.checkCanViewLease(leaseId);
-        return ResponseEntity.ok(rentPeriodService.getPeriodsByLeaseId(leaseId));
     }
 
     @PutMapping("/{id}/activate")
