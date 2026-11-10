@@ -2,7 +2,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../main.dart';
 import '../../models/dashboard_stats.dart';
@@ -13,8 +12,11 @@ import '../../services/dashboard_service.dart';
 import '../../services/lease_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/payment_service.dart';
+import '../../services/api_client.dart';
 import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
+import '../../utils/file_viewer.dart';
+import '../../widgets/authenticated_image.dart';
 import '../../widgets/cherry_logo.dart';
 import '../auth/invite_code_screen.dart';
 import 'paytr_payment_screen.dart';
@@ -453,9 +455,13 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       await _fetchTenantData();
     } catch (e) {
       if (!mounted) return;
+      String errorMsg = e.toString().replaceAll('Exception: ', '');
+      if (e is ApiException && e.statusCode == 409) {
+        errorMsg = 'Ev sahibi onayı bekleniyor';
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(errorMsg),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),
@@ -466,28 +472,11 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   }
 
   Future<void> _viewContract(String rawUrl) async {
-    try {
-      String url = rawUrl;
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        final prefix = url.startsWith('/') ? '' : '/';
-        url = '${ApiConstants.baseUrl}$prefix$url';
-      }
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sözleşme açılamadı: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    await FileViewer.open(
+      context: context,
+      fileUrl: rawUrl,
+      title: 'Kira Sözleşmesi',
+    );
   }
 
   void _showReceiptViewer(RentPeriod period) {
@@ -599,24 +588,11 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                                   ),
                                   const SizedBox(height: 18),
                                   ElevatedButton.icon(
-                                    onPressed: () async {
-                                      try {
-                                        final uri = Uri.parse(fullImageUrl);
-                                        if (await canLaunchUrl(uri)) {
-                                          await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                        } else {
-                                          await launchUrl(uri);
-                                        }
-                                      } catch (e) {
-                                        if (!dialogContext.mounted) return;
-                                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Dosya açılamadı: $e'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    },
+                                    onPressed: () => FileViewer.open(
+                                      context: dialogContext,
+                                      fileUrl: fullImageUrl,
+                                      title: 'Dekont Belgesi',
+                                    ),
                                     icon: const Icon(Icons.open_in_new, size: 18),
                                     label: const Text('PDF Olarak İndir/Görüntüle'),
                                     style: ElevatedButton.styleFrom(
@@ -632,48 +608,10 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                                 ],
                               ),
                             )
-                          : Image.network(
-                              fullImageUrl,
+                          : AuthenticatedImage(
+                              imageUrl: fullImageUrl,
                               fit: BoxFit.contain,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          final total = loadingProgress.expectedTotalBytes;
-                          final loaded = loadingProgress.cumulativeBytesLoaded;
-                          return Container(
-                            height: 200,
-                            alignment: Alignment.center,
-                            child: CircularProgressIndicator(
-                              value: total != null ? loaded / total : null,
-                              color: accentBlue,
                             ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            height: 160,
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.broken_image_outlined,
-                                  size: 40,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Görsel yüklenemedi',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade500,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1810,37 +1748,69 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _isActivatingLease ? null : _activateLease,
-              icon: _isActivatingLease
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+          Builder(
+            builder: (context) {
+              final hasApproval = _activeLease?.hasLandlordApproval ?? false;
+              final canActivate = !_isActivatingLease && hasApproval;
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: canActivate ? _activateLease : null,
+                      icon: _isActivatingLease
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.check_circle_outline, size: 20),
+                      label: Text(
+                        'Sözleşmeyi Onayla',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    )
-                  : const Icon(Icons.check_circle_outline, size: 20),
-              label: Text(
-                'Sözleşmeyi Onayla',
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: orangeBorder,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-            ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: orangeBorder,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
+                        disabledForegroundColor: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  if (!hasApproval) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.info_outline, size: 14, color: orangeBorder),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Ev sahibi onayı bekleniyor',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: orangeBorder,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ],
       ),

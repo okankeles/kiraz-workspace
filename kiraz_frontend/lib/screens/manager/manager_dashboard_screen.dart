@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/managed_property.dart';
+import '../../services/auth_service.dart';
 import '../../services/delegation_service.dart';
 import '../../widgets/cherry_logo.dart';
 import '../auth/login_screen.dart';
@@ -84,8 +85,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
     );
 
     if (confirmed == true) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+      await AuthService().logout();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
