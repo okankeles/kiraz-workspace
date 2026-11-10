@@ -1,6 +1,7 @@
 package com.ars.kirazbackend.service;
 
 import com.ars.kirazbackend.dto.LeaseRequest;
+import com.ars.kirazbackend.dto.RegenerateInviteResponse;
 import com.ars.kirazbackend.entity.LeaseAgreement;
 import com.ars.kirazbackend.entity.Property;
 import com.ars.kirazbackend.entity.RentPeriod;
@@ -232,6 +233,56 @@ public class LeaseService {
         lease.setInviteCodeUsed(true);
         lease.setInviteCodeUsedAt(LocalDateTime.now());
         return leaseRepository.save(lease);
+    }
+
+    @Transactional
+    public RegenerateInviteResponse regenerateInviteCode(Long leaseId, User landlord) {
+        LeaseAgreement lease = leaseRepository.findById(leaseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sözleşme bulunamadı: " + leaseId));
+
+        if (Boolean.TRUE.equals(lease.getInviteCodeUsed()) || lease.getStatus() == LeaseStatus.ACTIVE) {
+            throw new ConflictException("Davet kodu zaten kabul edilmiş bir sözleşme için yeni kod üretilemez.");
+        }
+        if (lease.getStatus() == LeaseStatus.CANCELLED) {
+            throw new ConflictException("İptal edilmiş bir sözleşme için yeni davet kodu üretilemez.");
+        }
+        if (lease.getApprovalStatus() == LeaseApprovalStatus.REJECTED || lease.getApprovalStatus() == LeaseApprovalStatus.TERMINATED) {
+            throw new ConflictException("Reddedilmiş veya feshedilmiş bir sözleşme için yeni davet kodu üretilemez.");
+        }
+
+        String newInviteCode = generateInviteCode();
+        LocalDateTime newExpiresAt = LocalDateTime.now().plusDays(7);
+
+        lease.setInviteCode(newInviteCode);
+        lease.setInviteCodeExpiresAt(newExpiresAt);
+        lease.setInviteCodeUsed(false);
+        lease.setInviteCodeUsedAt(null);
+
+        leaseRepository.save(lease);
+
+        if (lease.getTenant() != null && lease.getTenant().getEmail() != null) {
+            emailService.sendTenantInviteEmail(
+                    lease.getTenant().getEmail(),
+                    lease.getTenant().getFullName(),
+                    lease.getProperty() != null ? lease.getProperty().getTitle() : null,
+                    newInviteCode
+            );
+        }
+
+        auditLogService.record(
+                "LEASE_AGREEMENT",
+                lease.getId(),
+                "INVITE_CODE_REGENERATED",
+                landlord,
+                String.format("Kira sözleşmesi (ID: %d) için yeni davet kodu üretildi.", lease.getId())
+        );
+
+        return RegenerateInviteResponse.builder()
+                .leaseId(lease.getId())
+                .inviteCode(newInviteCode)
+                .inviteCodeExpiresAt(newExpiresAt)
+                .message("Yeni davet kodu başarıyla oluşturuldu.")
+                .build();
     }
 
     public List<LeaseAgreement> getLeasesForProperty(Long propertyId) {

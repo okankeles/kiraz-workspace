@@ -1,6 +1,8 @@
 package com.ars.kirazbackend.controller;
 
+import com.ars.kirazbackend.dto.RegenerateInviteResponse;
 import com.ars.kirazbackend.entity.LeaseAgreement;
+import com.ars.kirazbackend.entity.User;
 import com.ars.kirazbackend.service.AccessControlService;
 import com.ars.kirazbackend.service.LeaseService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -75,4 +77,17 @@ public class LandlordLeaseController {
         Long landlordId = authz.getCurrentUserId();
         return ResponseEntity.ok(leaseService.rejectLease(id, landlordId, reason));
     }
+
+    /**
+     * Sözleşme için yeni davet kodu üretir ve eskisini geçersiz kılar (Kanonik uç).
+     */
+    @PostMapping("/{id}/regenerate-invite")
+    @PreAuthorize("hasRole('LANDLORD')")
+    @Operation(summary = "Sözleşme davet kodunu yenile (Kanonik)")
+    public ResponseEntity<RegenerateInviteResponse> regenerateInvite(@PathVariable Long id) {
+        authz.checkCanLandlordManageLease(id);
+        User landlord = authz.getCurrentUser();
+        return ResponseEntity.ok(leaseService.regenerateInviteCode(id, landlord));
+    }
 }
+
