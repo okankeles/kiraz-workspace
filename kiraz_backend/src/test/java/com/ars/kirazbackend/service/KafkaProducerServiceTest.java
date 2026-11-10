@@ -121,7 +121,7 @@ class KafkaProducerServiceTest {
     @Test
     void testSendManagerAssignedEvent_Success() {
         com.ars.kirazbackend.event.ManagerAssignedEvent event =
-                new com.ars.kirazbackend.event.ManagerAssignedEvent(400L, "Moda 3+1", "manager@kiraz.app", "Ev Sahibi Mehmet");
+                new com.ars.kirazbackend.event.ManagerAssignedEvent(400L, "Moda 3+1", "manager@example.com", "Ev Sahibi Mehmet");
         CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(mockSendResult);
 
         when(kafkaTemplate.send(eq(KafkaConfig.PAYMENT_EVENTS_TOPIC), eq("400"), eq(event))).thenReturn(future);
@@ -139,7 +139,7 @@ class KafkaProducerServiceTest {
                 .thenReturn(future);
 
         CompletableFuture<SendResult<String, Object>> result =
-                kafkaProducerService.sendManagerAssignedEvent(401L, "Beşiktaş 1+1", "manager2@kiraz.app", "Ev Sahibi Ayşe");
+                kafkaProducerService.sendManagerAssignedEvent(401L, "Beşiktaş 1+1", "manager2@example.com", "Ev Sahibi Ayşe");
 
         assertNotNull(result);
         verify(kafkaTemplate, times(1)).send(eq(KafkaConfig.PAYMENT_EVENTS_TOPIC), eq("401"), any(com.ars.kirazbackend.event.ManagerAssignedEvent.class));

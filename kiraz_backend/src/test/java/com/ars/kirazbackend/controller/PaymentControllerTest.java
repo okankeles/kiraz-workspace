@@ -62,7 +62,7 @@ class PaymentControllerTest {
 
         User tenantUser = User.builder()
                 .id(10L)
-                .email("kiraci@kiraz.app")
+                .email("kiraci@example.com")
                 .role(RoleType.TENANT)
                 .build();
 
@@ -75,7 +75,7 @@ class PaymentControllerTest {
 
     @Test
     void testInitializePayTr_ReturnsToken() throws Exception {
-        PayTrInitRequest request = new PayTrInitRequest(50L, "kiraci@kiraz.app");
+        PayTrInitRequest request = new PayTrInitRequest(50L, "kiraci@example.com");
 
         PayTrInitResponse serviceResponse = PayTrInitResponse.builder()
                 .status("success")
@@ -84,7 +84,7 @@ class PaymentControllerTest {
                 .iframeUrl("https://www.paytr.com/odeme/guvenli/mock_paytr_token_123")
                 .build();
 
-        when(payTrService.initializePayment(eq(50L), anyString(), eq("kiraci@kiraz.app")))
+        when(payTrService.initializePayment(eq(50L), anyString(), eq("kiraci@example.com")))
                 .thenReturn(serviceResponse);
 
         mockMvc.perform(post("/api/payments/paytr/initialize")
@@ -97,7 +97,7 @@ class PaymentControllerTest {
                 .andExpect(jsonPath("$.iframeUrl").value("https://www.paytr.com/odeme/guvenli/mock_paytr_token_123"))
                 .andExpect(jsonPath("$.merchantOid").value("RENT-50-999999"));
 
-        verify(payTrService).initializePayment(eq(50L), eq("203.0.113.195"), eq("kiraci@kiraz.app"));
+        verify(payTrService).initializePayment(eq(50L), eq("203.0.113.195"), eq("kiraci@example.com"));
     }
 
     @Test

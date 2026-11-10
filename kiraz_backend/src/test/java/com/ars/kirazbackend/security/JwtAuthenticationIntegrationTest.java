@@ -59,7 +59,7 @@ public class JwtAuthenticationIntegrationTest {
 
         testLandlord = User.builder()
                 .fullName("Test Ev Sahibi")
-                .email("evsahibi@kiraztest.com")
+                .email("evsahibi@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.LANDLORD)
                 .referenceCode("REF12345")
@@ -130,7 +130,7 @@ public class JwtAuthenticationIntegrationTest {
         // Register contract test
         RegisterRequest registerReq = RegisterRequest.builder()
                 .fullName("Yeni Kiracı")
-                .email("yenikiraci@kiraztest.com")
+                .email("yenikiraci@example.com")
                 .password("Password123!")
                 .phone("05553334455")
                 .role(RoleType.TENANT)
@@ -145,13 +145,13 @@ public class JwtAuthenticationIntegrationTest {
                 .andExpect(jsonPath("$.expiresIn").value(900))
                 .andExpect(jsonPath("$.user.id").isNotEmpty())
                 .andExpect(jsonPath("$.user.fullName").value("Yeni Kiracı"))
-                .andExpect(jsonPath("$.user.email").value("yenikiraci@kiraztest.com"))
+                .andExpect(jsonPath("$.user.email").value("yenikiraci@example.com"))
                 .andExpect(jsonPath("$.user.role").value("TENANT"))
                 .andReturn();
 
         // Login contract test
         LoginRequest loginReq = LoginRequest.builder()
-                .email("yenikiraci@kiraztest.com")
+                .email("yenikiraci@example.com")
                 .password("Password123!")
                 .build();
 
@@ -162,7 +162,7 @@ public class JwtAuthenticationIntegrationTest {
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                 .andExpect(jsonPath("$.expiresIn").value(900))
-                .andExpect(jsonPath("$.user.email").value("yenikiraci@kiraztest.com"))
+                .andExpect(jsonPath("$.user.email").value("yenikiraci@example.com"))
                 .andExpect(jsonPath("$.user.role").value("TENANT"));
     }
 

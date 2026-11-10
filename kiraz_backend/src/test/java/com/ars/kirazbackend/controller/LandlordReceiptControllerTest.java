@@ -64,7 +64,7 @@ class LandlordReceiptControllerTest {
 
         landlord = User.builder()
                 .id(1L)
-                .email("landlord@kiraz.app")
+                .email("landlord@example.com")
                 .fullName("Ev Sahibi Ali")
                 .role(RoleType.LANDLORD)
                 .build();

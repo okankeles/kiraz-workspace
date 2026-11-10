@@ -54,7 +54,7 @@ class LandlordDashboardControllerTest {
 
         landlord = User.builder()
                 .id(1L)
-                .email("evsahibi@kiraz.app")
+                .email("evsahibi@example.com")
                 .fullName("Ev Sahibi Ali")
                 .role(RoleType.LANDLORD)
                 .build();

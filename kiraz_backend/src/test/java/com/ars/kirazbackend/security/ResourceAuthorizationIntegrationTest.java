@@ -104,49 +104,49 @@ public class ResourceAuthorizationIntegrationTest {
         // 1. Users
         landlordA = userRepository.save(User.builder()
                 .fullName("Ev Sahibi A")
-                .email("landlordA@kiraztest.com")
+                .email("landlordA@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.LANDLORD)
                 .build());
 
         landlordB = userRepository.save(User.builder()
                 .fullName("Ev Sahibi B")
-                .email("landlordB@kiraztest.com")
+                .email("landlordB@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.LANDLORD)
                 .build());
 
         tenantA = userRepository.save(User.builder()
                 .fullName("Kiracı A")
-                .email("tenantA@kiraztest.com")
+                .email("tenantA@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.TENANT)
                 .build());
 
         tenantB = userRepository.save(User.builder()
                 .fullName("Kiracı B")
-                .email("tenantB@kiraztest.com")
+                .email("tenantB@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.TENANT)
                 .build());
 
         agentValid = userRepository.save(User.builder()
                 .fullName("Vekil Emlakçı")
-                .email("agentValid@kiraztest.com")
+                .email("agentValid@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.AGENT)
                 .build());
 
         agentRevoked = userRepository.save(User.builder()
                 .fullName("İptal Edilmiş Emlakçı")
-                .email("agentRevoked@kiraztest.com")
+                .email("agentRevoked@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.AGENT)
                 .build());
 
         agentExpired = userRepository.save(User.builder()
                 .fullName("Süresi Dolmuş Emlakçı")
-                .email("agentExpired@kiraztest.com")
+                .email("agentExpired@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.AGENT)
                 .build());

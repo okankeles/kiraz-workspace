@@ -60,7 +60,7 @@ class LandlordDelegationControllerTest {
 
         landlord = User.builder()
                 .id(1L)
-                .email("landlord@kiraz.app")
+                .email("landlord@example.com")
                 .fullName("Ev Sahibi Ali")
                 .role(RoleType.LANDLORD)
                 .build();
@@ -69,7 +69,7 @@ class LandlordDelegationControllerTest {
                 50L,
                 "Kadıköy 2+1",
                 "Emlakçı Can",
-                "can@emlak.com",
+                "can@example.com",
                 "ACTIVE",
                 LocalDate.now()
         );
@@ -82,7 +82,7 @@ class LandlordDelegationControllerTest {
         );
         SecurityContextHolder.getContext().setAuthentication(auth);
 
-        DelegationRequestDto request = new DelegationRequestDto(10L, "can@emlak.com");
+        DelegationRequestDto request = new DelegationRequestDto(10L, "can@example.com");
 
         when(delegationService.assignManager(eq(request), any(User.class))).thenReturn(sampleDto);
 
@@ -92,7 +92,7 @@ class LandlordDelegationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(50L))
                 .andExpect(jsonPath("$.propertyName").value("Kadıköy 2+1"))
-                .andExpect(jsonPath("$.managerEmail").value("can@emlak.com"))
+                .andExpect(jsonPath("$.managerEmail").value("can@example.com"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
 
         verify(delegationService, times(1)).assignManager(eq(request), any(User.class));

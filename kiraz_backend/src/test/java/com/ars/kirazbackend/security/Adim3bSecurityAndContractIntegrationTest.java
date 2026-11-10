@@ -97,38 +97,38 @@ public class Adim3bSecurityAndContractIntegrationTest {
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
 
-        // 1. Users
+        // 1. Users (@example.com)
         landlordA = userRepository.save(User.builder()
                 .fullName("Ev Sahibi A")
-                .email("landlord_a@kiraz.com")
+                .email("landlord_a@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.LANDLORD)
                 .build());
 
         landlordB = userRepository.save(User.builder()
                 .fullName("Ev Sahibi B")
-                .email("landlord_b@kiraz.com")
+                .email("landlord_b@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.LANDLORD)
                 .build());
 
         tenantA = userRepository.save(User.builder()
                 .fullName("Kiraci A")
-                .email("tenant_a@kiraz.com")
+                .email("tenant_a@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.TENANT)
                 .build());
 
         tenantB = userRepository.save(User.builder()
                 .fullName("Kiraci B")
-                .email("tenant_b@kiraz.com")
+                .email("tenant_b@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.TENANT)
                 .build());
 
         agentValid = userRepository.save(User.builder()
                 .fullName("Emlakci Aktif")
-                .email("agent_valid@kiraz.com")
+                .email("agent_valid@example.com")
                 .passwordHash(passwordEncoder.encode("Password123!"))
                 .role(RoleType.AGENT)
                 .build());
