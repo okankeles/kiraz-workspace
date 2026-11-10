@@ -3,7 +3,7 @@ services:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: kiraz_zookeeper
     ports:
-      - "2181:2181"
+      - "127.0.0.1:2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -16,7 +16,7 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -33,7 +33,7 @@ services:
     image: elasticsearch:8.11.3
     container_name: kiraz_elasticsearch
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -49,7 +49,7 @@ services:
     depends_on:
       - elasticsearch
     ports:
-      - "5601:5601"
+      - "127.0.0.1:5601:5601"
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     networks:
@@ -61,7 +61,7 @@ services:
     depends_on:
       - elasticsearch
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     volumes:
       - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
     environment:
@@ -70,10 +70,41 @@ services:
     networks:
       - kiraz-network
 
+  postgres:
+    image: postgres:15-alpine
+    container_name: kiraz_db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-ars_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-kiraz_db}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - kiraz-network
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: kiraz_mailpit
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+    networks:
+      - kiraz-network
+
 volumes:
   esdata:
     driver: local
+  pgdata:
+    name: kiraz_backend_pgdata
 
 networks:
   kiraz-network:
     driver: bridge
+

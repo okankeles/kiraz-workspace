@@ -20,11 +20,14 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
         format_sql: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration
   mail:
     host: localhost
     port: 25
-    username: test@kiraz.app
-    password: testpassword
+    username: test@example.com
+    password: ""
     properties:
       mail:
         smtp:
@@ -56,8 +59,8 @@ paytr:
   merchant-key: "test-merchant-key"
   merchant-salt: "test-merchant-salt"
   test-mode: "1"
-  ok-url: "https://kiraz.app/payment-success"
-  fail-url: "https://kiraz.app/payment-fail"
+  ok-url: "https://example.com/payment-success"
+  fail-url: "https://example.com/payment-fail"
   timeout-limit: "30"
 
 cloudinary:

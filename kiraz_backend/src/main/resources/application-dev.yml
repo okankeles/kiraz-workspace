@@ -1,4 +1,18 @@
 # Development Profile Configuration
+spring:
+  mail:
+    host: ${DEV_SMTP_HOST:localhost}
+    port: ${DEV_SMTP_PORT:1025}
+    username: ""
+    password: ""
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+        debug: false
+
 springdoc:
   api-docs:
     enabled: true
