@@ -77,36 +77,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (response != null) {
-        String successMessage = 'Kayıt başarılı! Giriş yapabilirsiniz.';
-        if (response.referenceCode.isNotEmpty && (_selectedRole == 'LANDLORD' || _selectedRole == 'AGENT')) {
-          successMessage = 'Kayıt başarılı! Referans Kodunuz: ${response.referenceCode}';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(successMessage),
-            backgroundColor: Colors.green.shade700,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => LoginScreen(email: _emailController.text.trim()),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Kayıt yapılamadı, lütfen tekrar deneyiniz.'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      String successMessage = 'Kayıt başarılı! Giriş yapabilirsiniz.';
+      if (response.referenceCode.isNotEmpty && (_selectedRole == 'LANDLORD' || _selectedRole == 'AGENT')) {
+        successMessage = 'Kayıt başarılı! Referans Kodunuz: ${response.referenceCode}';
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(successMessage),
+          backgroundColor: Colors.green.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LoginScreen(email: _emailController.text.trim()),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);

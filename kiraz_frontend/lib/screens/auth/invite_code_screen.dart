@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../services/api_client.dart';
 import '../../services/lease_service.dart';
 import '../../widgets/cherry_logo.dart';
 
@@ -62,9 +63,22 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
+      String errorMessage;
+      if (e is ApiException) {
+        if (e.statusCode == 400) {
+          errorMessage = 'Davet kodu geçersiz, süresi dolmuş veya daha önce kullanılmış.';
+        } else if (e.statusCode == 429) {
+          errorMessage = 'Çok fazla deneme yapıldı. Lütfen bir dakika sonra tekrar deneyiniz.';
+        } else {
+          errorMessage = e.message;
+        }
+      } else {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(errorMessage),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),
@@ -246,16 +260,22 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
                     // Invite Code Field
                     TextFormField(
                       controller: _inviteCodeController,
+                      maxLength: 36,
                       textCapitalization: TextCapitalization.characters,
                       decoration: _inputDecoration(
                         label: 'Davet Kodu',
-                        hintText: 'Örn: ARS-XXXX',
+                        hintText: 'ARS-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
                         prefixIcon: Icons.vpn_key_outlined,
                         isDark: isDark,
                       ),
                       validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
+                        final code = value?.trim() ?? '';
+                        if (code.isEmpty) {
                           return 'Lütfen davet kodunu giriniz';
+                        }
+                        final regExp = RegExp(r'^ARS-[0-9a-fA-F]{32}$');
+                        if (!regExp.hasMatch(code)) {
+                          return 'Davet kodu "ARS-" ile başlayan 36 karakterlik kod olmalıdır';
                         }
                         return null;
                       },

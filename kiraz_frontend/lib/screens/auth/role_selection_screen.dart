@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/cherry_logo.dart';
 import 'invite_code_screen.dart';
 import 'login_screen.dart';
+import 'register_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -15,11 +16,11 @@ class RoleSelectionScreen extends StatelessWidget {
   static const Color iconBg = Color(0xFFEFF6FF);
   static const Color iconBorder = Color(0xFFDBEAFE);
 
-  void _navigateToAuth(BuildContext context, String role) {
+  void _navigateToRegister(BuildContext context, String role) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => LoginScreen(initialRole: role),
+        builder: (_) => RegisterScreen(initialRole: role),
       ),
     );
   }
@@ -144,7 +145,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     icon: Icons.home_rounded,
                     title: 'Ev Sahibi',
                     subtitle: 'Mülklerimi ve finansal durumumu yönetmek istiyorum.',
-                    onTap: () => _navigateToAuth(context, 'LANDLORD'),
+                    onTap: () => _navigateToRegister(context, 'LANDLORD'),
                   ),
 
                   const SizedBox(height: 16),
@@ -155,7 +156,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     icon: Icons.real_estate_agent_rounded,
                     title: 'Emlakçı / Mülk Yöneticisi',
                     subtitle: 'Yetkilendirildiğim portföyü ve sözleşmeleri yönetmek istiyorum.',
-                    onTap: () => _navigateToAuth(context, 'PROPERTY_MANAGER'),
+                    onTap: () => _navigateToRegister(context, 'PROPERTY_MANAGER'),
                   ),
 
                   const SizedBox(height: 16),
@@ -166,10 +167,44 @@ class RoleSelectionScreen extends StatelessWidget {
                     icon: Icons.person_rounded,
                     title: 'Kiracı',
                     subtitle: 'Kiralarımı takip etmek ve ödeme yapmak istiyorum.',
-                    onTap: () => _navigateToAuth(context, 'TENANT'),
+                    onTap: () => _navigateToRegister(context, 'TENANT'),
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+
+                  // Direct Login Option
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Zaten bir hesabınız var mı?',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LoginScreen(),
+                            ),
+                          );
+                        },
+                        child: Text(
+                          'Giriş Yap',
+                          style: GoogleFonts.inter(
+                            color: vibrantBlue,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
 
                   // Invite Code Quick Access
                   Center(
@@ -190,7 +225,6 @@ class RoleSelectionScreen extends StatelessWidget {
                             MaterialPageRoute(
                               builder: (_) => LoginScreen(
                                 email: email,
-                                initialRole: 'TENANT',
                               ),
                             ),
                           );
