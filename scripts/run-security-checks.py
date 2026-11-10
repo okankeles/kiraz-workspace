@@ -245,18 +245,27 @@ def main():
     periods_b = json.loads(periods_b_body)
     period_b_id = periods_b[0]["id"] if periods_b else 999999
 
-    # Landlord A'nın mülk ve dönem bilgilerini çek
+    # Landlord A'nın aktif mülk, sözleşme ve kira dönemini bul
+    property_a_id = None
+    active_lease_id = None
+    period_a_id = None
+
     _, p_a_body = http_request("GET", "/landlord/properties", token=landlord_token)
     properties_a = json.loads(p_a_body)
-    property_a_id = properties_a[0]["id"]
-
-    _, leases_a_body = http_request("GET", f"/leases/property/{property_a_id}", token=landlord_token)
-    leases_a = json.loads(leases_a_body)
-    lease_a_id = leases_a[0]["id"]
-
-    _, periods_a_body = http_request("GET", f"/periods/lease/{lease_a_id}", token=landlord_token)
-    periods_a = json.loads(periods_a_body)
-    period_a_id = periods_a[0]["id"]
+    for p in properties_a:
+        _, leases_body = http_request("GET", f"/leases/property/{p['id']}", token=landlord_token)
+        leases = json.loads(leases_body)
+        for l in leases:
+            if l.get("status") == "ACTIVE":
+                property_a_id = p["id"]
+                active_lease_id = l["id"]
+                _, periods_body = http_request("GET", f"/periods/lease/{l['id']}", token=landlord_token)
+                periods = json.loads(periods_body)
+                if periods:
+                    period_a_id = periods[0]["id"]
+                    break
+        if active_lease_id:
+            break
 
     print("\n--- TEST SENARYOLARI BAŞLIYOR ---\n")
 
@@ -412,13 +421,13 @@ def main():
     spec_ok1 = verify_endpoint_in_spec("GET", "/api/files/receipts/{periodId}")
     spec_ok2 = verify_endpoint_in_spec("GET", "/api/files/contracts/{leaseId}")
     status1, _ = http_request("GET", f"/files/receipts/{period_a_id}") # Tokensiz
-    status2, _ = http_request("GET", f"/files/contracts/{lease_a_id}") # Tokensiz
+    status2, _ = http_request("GET", f"/files/contracts/{active_lease_id}") # Tokensiz
     status3, _ = http_request("GET", f"/files/receipts/{period_b_id}", token=tenant_token) # Yetkisiz kiracı
     passed = spec_ok1 and spec_ok2 and (status1 == 401) and (status2 == 401) and (status3 in (403, 404))
     results.append({
         "no": 9,
         "name": "Tokensiz dosya stream → 401; Başka kiracının dekontuna erişim → 404",
-        "endpoint": f"GET /api/files/receipts/{period_a_id}, GET /api/files/contracts/{lease_a_id}",
+        "endpoint": f"GET /api/files/receipts/{period_a_id}, GET /api/files/contracts/{active_lease_id}",
         "spec_valid": "EVET" if (spec_ok1 and spec_ok2) else "GEÇERSİZ: uç yok",
         "expected": "401 -> 401 -> 404",
         "actual": f"{status1} -> {status2} -> {status3}",
@@ -471,7 +480,7 @@ def main():
     status3, _ = http_request("GET", f"/leases/validate-invite?inviteCode={old_invite_code}")
     
     # 4. Kiracısı bağlanmış (ACTIVE) sözleşmede kod yenileme -> 409 Conflict
-    status4, _ = http_request("POST", f"/landlord/leases/{lease_a_id}/regenerate-invite", token=landlord_token)
+    status4, _ = http_request("POST", f"/landlord/leases/{active_lease_id}/regenerate-invite", token=landlord_token)
     
     passed = spec_ok1 and spec_ok2 and (status1 == 200) and (status2 == 200) and (status3 in (400, 404)) and (status4 == 409)
     results.append({
@@ -555,15 +564,15 @@ def main():
     
     # 1. Sözleşme PDF -> 200
     d, ct = build_multipart({}, {"file": ("contract.pdf", pdf_bytes, "application/pdf")})
-    s_c_pdf, _ = http_request("POST", f"/leases/{lease_a_id}/contract", data=d, token=landlord_token, content_type=ct)
+    s_c_pdf, _ = http_request("POST", f"/leases/{active_lease_id}/contract", data=d, token=landlord_token, content_type=ct)
     
     # 2. Sözleşme WEBP -> 400
     d, ct = build_multipart({}, {"file": ("contract.webp", webp_bytes, "image/webp")})
-    s_c_webp, _ = http_request("POST", f"/leases/{lease_a_id}/contract", data=d, token=landlord_token, content_type=ct)
+    s_c_webp, _ = http_request("POST", f"/leases/{active_lease_id}/contract", data=d, token=landlord_token, content_type=ct)
     
     # 3. Sözleşme TXT -> 400
     d, ct = build_multipart({}, {"file": ("contract.txt", txt_bytes, "text/plain")})
-    s_c_txt, _ = http_request("POST", f"/leases/{lease_a_id}/contract", data=d, token=landlord_token, content_type=ct)
+    s_c_txt, _ = http_request("POST", f"/leases/{active_lease_id}/contract", data=d, token=landlord_token, content_type=ct)
     
     # 4. Dekont WEBP -> 400
     d, ct = build_multipart({}, {"file": ("receipt.webp", webp_bytes, "image/webp")})
@@ -577,7 +586,7 @@ def main():
     results.append({
         "no": 15,
         "name": "Dosya formatı doğrulaması: PDF 200, WEBP 400, TXT 400",
-        "endpoint": f"POST /api/leases/{lease_a_id}/contract, POST /api/tenant/receipts/{period_a_id}",
+        "endpoint": f"POST /api/leases/{active_lease_id}/contract, POST /api/tenant/receipts/{period_a_id}",
         "spec_valid": "EVET" if (spec_ok1 and spec_ok2) else "GEÇERSİZ: uç yok",
         "expected": "PDF: 200, WEBP: 400, TXT: 400",
         "actual": f"PDF: {s_c_pdf}, WEBP: {s_c_webp}/{s_r_webp}, TXT: {s_c_txt}/{s_r_txt}",
