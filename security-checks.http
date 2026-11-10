@@ -1,0 +1,261 @@
+### ==============================================================================
+### KiraZ PropTech - Faz 0 / Adım 6: Güvenlik ve Yetkilendirme Doğrulama Kataloğu
+### ==============================================================================
+### Değişkenler:
+@baseUrl = http://localhost:8080/api
+@landlordEmail = dev.landlord@example.com
+@landlordPassword = {{$dotenv DEV_SEED_LANDLORD_PASSWORD}}
+@tenantEmail = dev.tenant@example.com
+@tenantPassword = {{$dotenv DEV_SEED_TENANT_PASSWORD}}
+@agentEmail = dev.agent@example.com
+@agentPassword = {{$dotenv DEV_SEED_AGENT_PASSWORD}}
+@managerEmail = dev.manager@example.com
+@managerPassword = {{$dotenv DEV_SEED_MANAGER_PASSWORD}}
+
+### ------------------------------------------------------------------------------
+### 0. Giriş Yaparak Oturum Token'larını Alma
+### ------------------------------------------------------------------------------
+
+# @name loginLandlord
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{landlordEmail}}",
+  "password": "{{landlordPassword}}"
+}
+
+###
+
+# @name loginTenant
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{tenantEmail}}",
+  "password": "{{tenantPassword}}"
+}
+
+###
+
+# @name loginAgent
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{agentEmail}}",
+  "password": "{{agentPassword}}"
+}
+
+###
+
+# @name loginManager
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{managerEmail}}",
+  "password": "{{managerPassword}}"
+}
+
+### ------------------------------------------------------------------------------
+### Senaryo 1: X-User-Id header'ı ile başka kullanıcıyı taklit → 401 Unauthorized
+### ------------------------------------------------------------------------------
+# @name scenario1_XUserIdSpoofing
+GET {{baseUrl}}/landlord/dashboard
+X-User-Id: 18
+
+### ------------------------------------------------------------------------------
+### Senaryo 2: Ev sahibi A'nın token'ı ile ev sahibi B'nin mülkü ve dönemi → 403 / 404
+### ------------------------------------------------------------------------------
+# @name scenario2_LandlordIDOR
+GET {{baseUrl}}/properties/999999
+Authorization: Bearer {{loginLandlord.response.body.accessToken}}
+
+### ------------------------------------------------------------------------------
+### Senaryo 3: Kiracı A'nın token'ı ile kiracı B'nin dönemine dekont yükleme → 403 / 404
+### ------------------------------------------------------------------------------
+# @name scenario3_TenantReceiptIDOR
+POST {{baseUrl}}/tenant/receipts/999999
+Authorization: Bearer {{loginTenant.response.body.accessToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="dekont.png"
+Content-Type: image/png
+
+<fake-png-content>
+--boundary--
+
+### ------------------------------------------------------------------------------
+### Senaryo 4: Delegasyonu iptal edilmiş emlakçı ile mülke erişim → 403 / 404
+### ------------------------------------------------------------------------------
+# @name scenario4_RevokedAgentAccess
+GET {{baseUrl}}/properties/999999
+Authorization: Bearer {{loginAgent.response.body.accessToken}}
+
+### ------------------------------------------------------------------------------
+### Senaryo 5: Süresi dolmuş access token → 401; refresh sonrası aynı istek → 200
+### ------------------------------------------------------------------------------
+# 5a: Geçersiz / Süresi dolmuş token ile istek → 401
+# @name scenario5a_ExpiredToken
+GET {{baseUrl}}/tenant/dashboard
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxOSIsImV4cCI6MTUxNDc2NDgwMH0.INVALID_SIGNATURE
+
+###
+# 5b: Refresh token ile yeni token alma → 200
+# @name scenario5b_RefreshToken
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{loginTenant.response.body.refreshToken}}"
+}
+
+### ------------------------------------------------------------------------------
+### Senaryo 6: Kullanılmış refresh token ile refresh → 401 Unauthorized
+### ------------------------------------------------------------------------------
+# @name scenario6_ReusedRefreshToken
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{loginTenant.response.body.refreshToken}}"
+}
+
+### ------------------------------------------------------------------------------
+### Senaryo 7: PayTR callback'ine geçersiz hash ile istek → 400 Bad Request
+### ------------------------------------------------------------------------------
+# @name scenario7_PayTrInvalidHash
+POST {{baseUrl}}/payments/paytr-callback
+Content-Type: application/x-www-form-urlencoded
+
+merchant_oid=RENT-16-1700000000&status=success&total_amount=25000&hash=FORGED_INVALID_HASH_VALUE
+
+### ------------------------------------------------------------------------------
+### Senaryo 8: Kaldırılan PUT /api/periods/{id}/status → 404 Not Found
+### ------------------------------------------------------------------------------
+# @name scenario8_RemovedPeriodStatus
+PUT {{baseUrl}}/periods/1/status?status=PAID
+Authorization: Bearer {{loginLandlord.response.body.accessToken}}
+
+### ------------------------------------------------------------------------------
+### Senaryo 9: Token olmadan dosya erişimi → 401; Başka kiracının dekontu → 404
+### ------------------------------------------------------------------------------
+# 9a: Token olmadan dekont stream → 401
+# @name scenario9a_NoTokenFileAccess
+GET {{baseUrl}}/files/receipts/1
+
+###
+# 9b: Yetkisiz kiracının başka kiracı dekontuna erişimi → 404
+# @name scenario9b_OtherTenantReceiptAccess
+GET {{baseUrl}}/files/receipts/999999
+Authorization: Bearer {{loginTenant.response.body.accessToken}}
+
+### ------------------------------------------------------------------------------
+### Senaryo 10: Ev sahibi onayı olmayan sözleşmeyi kiracının aktive etmesi → 409 Conflict
+### ------------------------------------------------------------------------------
+# @name scenario10_ActivateWithoutLandlordApproval
+PUT {{baseUrl}}/leases/17/activate
+Authorization: Bearer {{loginTenant.response.body.accessToken}}
+
+### ------------------------------------------------------------------------------
+### Senaryo 11: Davet kodu doğrulama ve hız sınırı (Rate Limit) aşılınca → 429
+### ------------------------------------------------------------------------------
+# @name scenario11_ValidateInviteRateLimit
+GET {{baseUrl}}/leases/validate-invite?inviteCode=INVALID_INVITE_CODE_TEST
+
+### ------------------------------------------------------------------------------
+### Senaryo 12: Deprecated / Silinmiş uçlar (Adım 5b sonrası) → 404 Not Found
+### ------------------------------------------------------------------------------
+# 12a: /api/properties/landlord kaldırıldı (Kanonik: /api/landlord/properties)
+# @name scenario12a_DeprecatedPropertyLandlord
+GET {{baseUrl}}/properties/landlord
+Authorization: Bearer {{loginLandlord.response.body.accessToken}}
+
+###
+# 12b: /api/dashboard/landlord kaldırıldı (Kanonik: /api/landlord/dashboard)
+# @name scenario12b_DeprecatedDashboardLandlord
+GET {{baseUrl}}/dashboard/landlord
+Authorization: Bearer {{loginLandlord.response.body.accessToken}}
+
+### ------------------------------------------------------------------------------
+### Senaryo 13: PUT /api/properties/{id} Yetkilendirme Matrisi
+### ------------------------------------------------------------------------------
+# 13a: Sahibi günceller → 200 OK
+# @name scenario13a_OwnerUpdate
+PUT {{baseUrl}}/properties/15
+Authorization: Bearer {{loginLandlord.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "KiraZ Kadıköy Plaza No:101 (Güncellendi)",
+  "address": "Moda Caddesi No:101 Kadıköy",
+  "city": "İstanbul"
+}
+
+###
+# 13b: Başka ev sahibi veya yetkisiz mülk → 404 Not Found
+# @name scenario13b_NonOwnerLandlordUpdate
+PUT {{baseUrl}}/properties/999999
+Authorization: Bearer {{loginLandlord.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Başka Ev Sahibinin Mülkü",
+  "address": "Adres",
+  "city": "İstanbul"
+}
+
+###
+# 13c: Emlakçı güncelleyemez → 403 Forbidden
+# @name scenario13c_AgentForbiddenUpdate
+PUT {{baseUrl}}/properties/15
+Authorization: Bearer {{loginAgent.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Emlakçı Güncelleme Denemesi",
+  "address": "Adres",
+  "city": "İstanbul"
+}
+
+###
+# 13d: Kiracı güncelleyemez → 403 Forbidden
+# @name scenario13d_TenantForbiddenUpdate
+PUT {{baseUrl}}/properties/15
+Authorization: Bearer {{loginTenant.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Kiracı Güncelleme Denemesi",
+  "address": "Adres",
+  "city": "İstanbul"
+}
+
+### ------------------------------------------------------------------------------
+### Senaryo 14: POST /api/landlord/leases/{id}/regenerate-invite
+### ------------------------------------------------------------------------------
+# @name scenario14_RegenerateInviteCode
+POST {{baseUrl}}/landlord/leases/17/regenerate-invite
+Authorization: Bearer {{loginLandlord.response.body.accessToken}}
+
+### ------------------------------------------------------------------------------
+### Senaryo 15: Sözleşme ve Dekont Dosya Formatı Doğrulaması (PDF, JPEG, PNG → 200; WEBP & TXT → 400)
+### ------------------------------------------------------------------------------
+# @name scenario15_UploadTxtRejected
+POST {{baseUrl}}/leases/16/contract
+Authorization: Bearer {{loginLandlord.response.body.accessToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="sozlesme.txt"
+Content-Type: text/plain
+
+Düz metin formatında geçersiz sözleşme
+--boundary--
+
+### ------------------------------------------------------------------------------
+### Senaryo 16: Host'tan TCP Üzerinden PostgreSQL Şifreli Bağlantı Doğrulaması
+### ------------------------------------------------------------------------------
+# psql -h localhost -p 5433 -U ars_admin -d kiraz_db (PGPASSWORD=ars_password_2026) -> 200 / Success
