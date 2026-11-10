@@ -2,6 +2,7 @@ package com.ars.kirazbackend.entity;
 
 import com.ars.kirazbackend.enums.LeaseApprovalStatus;
 import com.ars.kirazbackend.enums.LeaseStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
@@ -23,6 +24,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -71,7 +73,31 @@ public class LeaseAgreement {
 
     private String inviteCode;
 
+    private LocalDateTime inviteCodeExpiresAt;
+
+    private Boolean inviteCodeUsed;
+
+    private LocalDateTime inviteCodeUsedAt;
+
     private String contractFileUrl;
+
+    @JsonIgnore
+    private String contractFilePath;
+
+    @JsonProperty("contractFileUrl")
+    public String getContractFileUrl() {
+        if (this.id != null && ((this.contractFilePath != null && !this.contractFilePath.isBlank()) ||
+                (this.contractFileUrl != null && !this.contractFileUrl.isBlank()))) {
+            return "/api/files/contracts/" + this.id;
+        }
+        return this.contractFileUrl;
+    }
+
+    @Transient
+    @JsonProperty("contractDocumentUrl")
+    public String getContractDocumentUrl() {
+        return getContractFileUrl();
+    }
 
     @Transient
     @JsonProperty("approvalStatusName")

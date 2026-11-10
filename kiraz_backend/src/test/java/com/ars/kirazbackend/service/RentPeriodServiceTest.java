@@ -275,7 +275,7 @@ class RentPeriodServiceTest {
 
         assertNotNull(result);
         assertEquals(PaymentStatus.WAITING_APPROVAL, result.getStatus());
-        assertEquals("/uploads/receipts/dekont.png", result.getReceiptImageUrl());
+        assertEquals("/api/files/receipts/10", result.getReceiptImageUrl());
 
         verify(rentPeriodRepository).save(period);
         verify(auditLogService).record(eq("RENT_PERIOD"), eq(10L), eq("RECEIPT_UPLOADED"), eq(tenant), anyString());

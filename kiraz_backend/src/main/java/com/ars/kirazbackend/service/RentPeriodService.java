@@ -218,8 +218,9 @@ public class RentPeriodService {
         RentPeriod period = rentPeriodRepository.findById(periodId)
                 .orElseThrow(() -> new RuntimeException("Kira dönemi bulunamadı: " + periodId));
 
-        String fileUrl = fileStorageService.storeFile(file);
-        period.setReceiptImageUrl(fileUrl);
+        String storedPath = fileStorageService.storeFile(file);
+        period.setReceiptFilePath(storedPath);
+        period.setReceiptImageUrl("/api/files/receipts/" + period.getId());
         period.setStatus(PaymentStatus.WAITING_APPROVAL);
 
         RentPeriod savedPeriod = rentPeriodRepository.save(period);
@@ -240,7 +241,7 @@ public class RentPeriodService {
                 savedPeriod.getId(),
                 tenantId,
                 leaseId,
-                fileUrl,
+                savedPeriod.getReceiptImageUrl(),
                 savedPeriod.getMonth(),
                 savedPeriod.getYear()
         ));

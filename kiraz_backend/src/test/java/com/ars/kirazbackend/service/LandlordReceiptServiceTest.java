@@ -109,7 +109,7 @@ class LandlordReceiptServiceTest {
         assertEquals(11, dto.month());
         assertEquals(2026, dto.year());
         assertEquals(BigDecimal.valueOf(15000.00), dto.amount());
-        assertEquals("http://cloudinary.com/dekont123.jpg", dto.receiptImageUrl());
+        assertEquals("/api/files/receipts/100", dto.receiptImageUrl());
         assertEquals(uploadTime, dto.uploadDate());
     }
 

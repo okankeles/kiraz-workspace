@@ -163,7 +163,7 @@ class PaymentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(50))
                 .andExpect(jsonPath("$.status").value("WAITING_APPROVAL"))
-                .andExpect(jsonPath("$.receiptImageUrl").value("/uploads/receipts/dekont.pdf"));
+                .andExpect(jsonPath("$.receiptImageUrl").value("/api/files/receipts/50"));
 
         verify(rentPeriodService).uploadReceipt(eq(50L), any(MultipartFile.class));
     }

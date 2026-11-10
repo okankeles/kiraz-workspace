@@ -1,5 +1,7 @@
 package com.ars.kirazbackend.config;
 
+import com.ars.kirazbackend.exception.ConflictException;
+import com.ars.kirazbackend.exception.FileValidationException;
 import com.ars.kirazbackend.exception.InvalidRefreshTokenException;
 import com.ars.kirazbackend.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -9,6 +11,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,6 +27,43 @@ public class GlobalExceptionHandler {
         body.put("error", "Not Found");
         body.put("message", ex.getMessage() != null ? ex.getMessage() : "Kaynak bulunamadı");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflictException(ConflictException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", 409);
+        body.put("error", "Conflict");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(FileValidationException.class)
+    public ResponseEntity<Map<String, Object>> handleFileValidationException(FileValidationException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", 400);
+        body.put("error", "Bad Request");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", 400);
+        body.put("error", "Bad Request");
+        body.put("message", "Dosya boyutu 10 MB sınırını aşamaz.");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusException(ResponseStatusException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        int statusCode = ex.getStatusCode().value();
+        body.put("status", statusCode);
+        body.put("error", ex.getStatusCode().toString());
+        body.put("message", ex.getReason() != null ? ex.getReason() : ex.getMessage());
+        return ResponseEntity.status(ex.getStatusCode()).body(body);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

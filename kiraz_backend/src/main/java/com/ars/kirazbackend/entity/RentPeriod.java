@@ -1,7 +1,9 @@
 package com.ars.kirazbackend.entity;
 
 import com.ars.kirazbackend.enums.PaymentStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -49,5 +51,17 @@ public class RentPeriod {
 
     private String receiptImageUrl;
 
+    @JsonIgnore
+    private String receiptFilePath;
+
     private LocalDate paymentDate;
+
+    @JsonProperty("receiptImageUrl")
+    public String getReceiptImageUrl() {
+        if (this.id != null && ((this.receiptFilePath != null && !this.receiptFilePath.isBlank()) ||
+                (this.receiptImageUrl != null && !this.receiptImageUrl.isBlank()))) {
+            return "/api/files/receipts/" + this.id;
+        }
+        return this.receiptImageUrl;
+    }
 }
