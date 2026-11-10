@@ -49,6 +49,8 @@ cp .env.example .env
 ---
 
 ### 3. Altyapı Servislerini Ayağa Kaldırma (Docker Compose)
+Tüm altyapı servisleri projenin kök dizinindeki **tek `docker-compose.yml`** dosyasında birleştirilmiştir (`kiraz_backend/` altında mükerrer dosya tutulmaz). PostgreSQL veritabanı kalıcılığı `kiraz_backend_pgdata` isimli Docker volume ile sağlanır.
+
 Kök dizindeki `docker-compose.yml` dosyası PostgreSQL, Kafka, Zookeeper, Elasticsearch, Logstash, Kibana ve Mailpit servislerini tek komutla başlatır. Tüm servis portları güvenlik gereği yalnızca yerel makineye (`127.0.0.1`) bağlanmıştır:
 
 ```bash
@@ -60,7 +62,7 @@ docker compose ps
 ```
 
 Beklenen durum:
-- `kiraz_db` (PostgreSQL 15): `127.0.0.1:5433->5432`
+- `kiraz_db` (PostgreSQL 15): `127.0.0.1:5433->5432` (Volume: `kiraz_backend_pgdata`)
 - `kiraz_mailpit` (Mailpit SMTP / Web UI): `127.0.0.1:1025` (SMTP) / `127.0.0.1:8025` (Web UI - [http://localhost:8025](http://localhost:8025))
 - `kiraz_kafka` (Kafka): `127.0.0.1:9092`
 - `kiraz_zookeeper`: `127.0.0.1:2181`
