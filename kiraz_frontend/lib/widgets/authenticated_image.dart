@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../services/api_client.dart';
+import '../utils/error_handler.dart';
 
 /// JWT Bearer token gerektiren dekont ve sözleşme görsellerini ApiClient üzerinden
 /// güvenli biçimde indirip Image.memory ile gösteren widget.
@@ -83,7 +84,7 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = ErrorHandler.getUserFriendlyMessage(e, defaultMessage: 'Görsel yüklenemedi');
           _isLoading = false;
         });
       }

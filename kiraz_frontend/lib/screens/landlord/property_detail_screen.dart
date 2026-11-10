@@ -12,6 +12,7 @@ import '../../models/property_delegation.dart';
 import '../../services/api_client.dart';
 import '../../services/delegation_service.dart';
 import '../../services/lease_service.dart';
+import '../../utils/error_handler.dart';
 import '../tenant/rent_period_list_screen.dart';
 import 'assign_tenant_screen.dart';
 import 'edit_property_screen.dart';
@@ -91,7 +92,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           errorMsg = e.message;
         }
       } else {
-        errorMsg = e.toString().replaceAll('Exception: ', '');
+        errorMsg = ErrorHandler.getUserFriendlyMessage(e);
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -283,7 +284,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Sözleşme yüklenemedi: ${e.toString().replaceAll('Exception: ', '')}'),
+          content: Text('Sözleşme yüklenemedi: ${ErrorHandler.getUserFriendlyMessage(e)}'),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),
@@ -359,7 +360,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(ErrorHandler.getUserFriendlyMessage(e)),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -432,7 +433,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(ErrorHandler.getUserFriendlyMessage(e)),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -711,7 +712,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     } catch (e) {
       // 4. Hata Yakalama: BottomSheet'i kapatmadan butondaki loading statüsünü kaldır ve kırmızı SnackBar göster
       setLoading(false);
-      final errorMsg = e.toString().replaceAll('Exception: ', '');
+      final errorMsg = ErrorHandler.getUserFriendlyMessage(e);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -944,7 +945,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(ErrorHandler.getUserFriendlyMessage(e)),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),

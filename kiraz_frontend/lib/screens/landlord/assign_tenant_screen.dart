@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/lease_service.dart';
+import '../../utils/error_handler.dart';
 
 class AssignTenantScreen extends StatefulWidget {
   final int propertyId;
@@ -206,7 +207,7 @@ class _AssignTenantScreenState extends State<AssignTenantScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(ErrorHandler.getUserFriendlyMessage(e)),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),

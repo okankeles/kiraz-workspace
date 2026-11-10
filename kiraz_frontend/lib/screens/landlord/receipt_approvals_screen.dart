@@ -6,6 +6,7 @@ import '../../models/receipt_approval_item.dart';
 import '../../services/landlord_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/file_viewer.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/authenticated_image.dart';
 
 class ReceiptApprovalsScreen extends StatefulWidget {
@@ -56,7 +57,7 @@ class _ReceiptApprovalsScreenState extends State<ReceiptApprovalsScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }

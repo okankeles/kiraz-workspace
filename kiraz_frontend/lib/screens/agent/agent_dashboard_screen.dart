@@ -12,6 +12,7 @@ import '../../services/dashboard_service.dart';
 import '../../services/delegation_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/property_service.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/cherry_logo.dart';
 import '../auth/login_screen.dart';
 import '../landlord/assign_tenant_screen.dart';
@@ -95,7 +96,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }

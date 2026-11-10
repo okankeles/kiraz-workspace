@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../services/api_client.dart';
 import '../../services/lease_service.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/cherry_logo.dart';
 
 class InviteCodeScreen extends StatefulWidget {
@@ -73,7 +74,7 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
           errorMessage = e.message;
         }
       } else {
-        errorMessage = e.toString().replaceAll('Exception: ', '');
+        errorMessage = ErrorHandler.getUserFriendlyMessage(e, defaultMessage: 'Davet kodu doğrulanamadı.');
       }
 
       ScaffoldMessenger.of(context).showSnackBar(

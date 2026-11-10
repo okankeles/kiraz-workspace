@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../services/auth_service.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/cherry_logo.dart';
 import 'login_screen.dart';
 
@@ -102,7 +103,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Kayıt başarısız: ${e.toString().replaceAll('Exception: ', '')}'),
+          content: Text(ErrorHandler.getUserFriendlyMessage(e, defaultMessage: 'Kayıt işlemi başarısız oldu. Lütfen bilgilerinizi kontrol edin.')),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),

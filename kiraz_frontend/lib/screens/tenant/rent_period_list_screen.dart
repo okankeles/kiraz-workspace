@@ -9,6 +9,7 @@ import '../../services/payment_service.dart';
 import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/file_viewer.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/authenticated_image.dart';
 import 'paytr_payment_screen.dart';
 
@@ -94,7 +95,7 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }
@@ -126,7 +127,7 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Dekont yüklenemedi: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text('Dekont yüklenemedi: ${ErrorHandler.getUserFriendlyMessage(e)}'),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -209,7 +210,7 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
               const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Ödeme başlatılamadı: ${e.toString().replaceAll('Exception: ', '')}'),
+                child: Text('Ödeme başlatılamadı: ${ErrorHandler.getUserFriendlyMessage(e)}'),
               ),
             ],
           ),
@@ -242,7 +243,7 @@ class _RentPeriodListScreenState extends State<RentPeriodListScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Hata: ${e.toString().replaceAll('Exception: ', '')}'),
+          content: Text(ErrorHandler.getUserFriendlyMessage(e)),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/property_service.dart';
+import '../../utils/error_handler.dart';
 
 class AddPropertyScreen extends StatefulWidget {
   const AddPropertyScreen({super.key});
@@ -97,7 +98,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(ErrorHandler.getUserFriendlyMessage(e)),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),

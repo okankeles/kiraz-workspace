@@ -16,6 +16,7 @@ import '../../services/api_client.dart';
 import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/file_viewer.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/authenticated_image.dart';
 import '../../widgets/cherry_logo.dart';
 import '../auth/invite_code_screen.dart';
@@ -111,7 +112,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }
@@ -344,7 +345,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
+            content: Text(ErrorHandler.getUserFriendlyMessage(e)),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -425,7 +426,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
               const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Ödeme başlatılamadı: ${e.toString().replaceAll('Exception: ', '')}'),
+                child: Text('Ödeme başlatılamadı: ${ErrorHandler.getUserFriendlyMessage(e)}'),
               ),
             ],
           ),
@@ -455,7 +456,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       await _fetchTenantData();
     } catch (e) {
       if (!mounted) return;
-      String errorMsg = e.toString().replaceAll('Exception: ', '');
+      String errorMsg = ErrorHandler.getUserFriendlyMessage(e);
       if (e is ApiException && e.statusCode == 409) {
         errorMsg = 'Ev sahibi onayı bekleniyor';
       }

@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/lease.dart';
 import '../../models/rent_period.dart';
 import '../../services/payment_service.dart';
+import '../../utils/error_handler.dart';
 
 class EftPaymentScreen extends StatefulWidget {
   final RentPeriod period;
@@ -327,7 +328,7 @@ class _EftPaymentScreenState extends State<EftPaymentScreen> {
               const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Dekont yüklenemedi: ${e.toString().replaceAll('Exception: ', '')}'),
+                child: Text('Dekont yüklenemedi: ${ErrorHandler.getUserFriendlyMessage(e)}'),
               ),
             ],
           ),

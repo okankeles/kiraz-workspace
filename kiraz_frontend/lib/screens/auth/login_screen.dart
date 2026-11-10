@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../services/auth_service.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/cherry_logo.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'invite_code_screen.dart';
@@ -74,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(ErrorHandler.getUserFriendlyMessage(e, defaultMessage: 'Giriş yapılamadı. Lütfen bilgilerinizi kontrol edin.')),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),

@@ -7,6 +7,7 @@ import '../../models/property.dart';
 import '../../models/property_delegation.dart';
 import '../../services/delegation_service.dart';
 import '../../services/property_service.dart';
+import '../../utils/error_handler.dart';
 
 class DelegationsScreen extends StatefulWidget {
   const DelegationsScreen({super.key});
@@ -56,7 +57,7 @@ class _DelegationsScreenState extends State<DelegationsScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }

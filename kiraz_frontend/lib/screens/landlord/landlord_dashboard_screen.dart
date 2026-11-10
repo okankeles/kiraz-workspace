@@ -17,6 +17,7 @@ import '../../services/lease_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/cherry_logo.dart';
 import '../tenant/rent_period_list_screen.dart';
 import 'receipt_approvals_screen.dart';
@@ -244,7 +245,7 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }
@@ -1759,7 +1760,7 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(ErrorHandler.getUserFriendlyMessage(e)),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1824,7 +1825,7 @@ class _LandlordDashboardScreenState extends State<LandlordDashboardScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(ErrorHandler.getUserFriendlyMessage(e)),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),

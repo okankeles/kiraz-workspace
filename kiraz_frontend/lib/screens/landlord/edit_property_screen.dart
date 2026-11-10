@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/property.dart';
 import '../../services/api_client.dart';
 import '../../services/property_service.dart';
+import '../../utils/error_handler.dart';
 
 class EditPropertyScreen extends StatefulWidget {
   final Property property;
@@ -129,7 +130,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           errorMessage = e.message;
         }
       } else {
-        errorMessage = e.toString().replaceAll('Exception: ', '');
+        errorMessage = ErrorHandler.getUserFriendlyMessage(e);
       }
 
       ScaffoldMessenger.of(context).showSnackBar(

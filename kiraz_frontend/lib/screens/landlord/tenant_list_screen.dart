@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/lease.dart';
 import '../../services/lease_service.dart';
+import '../../utils/error_handler.dart';
 
 class TenantListScreen extends StatefulWidget {
   const TenantListScreen({super.key});
@@ -55,7 +56,7 @@ class _TenantListScreenState extends State<TenantListScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }

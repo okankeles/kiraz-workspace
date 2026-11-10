@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/managed_property.dart';
 import '../../services/auth_service.dart';
 import '../../services/delegation_service.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/cherry_logo.dart';
 import '../auth/login_screen.dart';
 
@@ -61,7 +62,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }

@@ -10,6 +10,7 @@ import '../../services/lease_service.dart';
 import '../../services/payment_service.dart';
 import '../../services/rent_period_service.dart';
 import '../../utils/constants.dart';
+import '../../utils/error_handler.dart';
 import 'eft_payment_screen.dart';
 import 'paytr_payment_screen.dart';
 
@@ -127,7 +128,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }
@@ -438,7 +439,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       setState(() => _payingPeriodId = null);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ödeme başlatılamadı: ${e.toString().replaceAll('Exception: ', '')}'),
+          content: Text('Ödeme başlatılamadı: ${ErrorHandler.getUserFriendlyMessage(e)}'),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
         ),

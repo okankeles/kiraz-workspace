@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/property.dart';
 import '../../services/property_service.dart';
+import '../../utils/error_handler.dart';
 import 'add_property_screen.dart';
 import 'property_detail_screen.dart';
 
@@ -44,7 +45,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         _isLoading = false;
       });
     }
